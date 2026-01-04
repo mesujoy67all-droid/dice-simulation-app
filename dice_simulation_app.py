@@ -65,7 +65,7 @@ for key in wip_keys:
     initial_wip[key] = st.sidebar.number_input(
         f"{key}",
         min_value=4,
-        value=0,
+        value=4,
         step=1
     )
 
@@ -141,5 +141,6 @@ if st.sidebar.button("▶ Run Simulation"):
     # Charts
     st.subheader("📈 Performance Trends")
     st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
+
 
 
