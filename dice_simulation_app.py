@@ -24,7 +24,7 @@ st.sidebar.header("Simulation Settings")
 num_members = st.sidebar.number_input(
     "Number of Members (Workstations)",
     min_value=2,
-    value=3,
+    value=7,
     step=1
 )
 
@@ -32,7 +32,7 @@ num_days = st.sidebar.number_input(
     "Number of Days",
     min_value=1,
     max_value=100000,
-    value=10,
+    value=20,
     step=1
 )
 
@@ -141,6 +141,7 @@ if st.sidebar.button("▶ Run Simulation"):
     # Charts
     st.subheader("📈 Performance Trends")
     st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
+
 
 
 
