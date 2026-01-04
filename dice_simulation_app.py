@@ -141,4 +141,4 @@ if st.sidebar.button("▶ Run Simulation"):
     # Charts
     st.subheader("📈 Performance Trends")
     st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
-echo "# dice-simulation-app" >> README.md
+
