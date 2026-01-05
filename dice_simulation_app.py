@@ -59,7 +59,8 @@ if not st.session_state.user_name:
     st.stop()
 
 # --- Navigation Tabs ---
-tab1, tab2 = st.tabs(["🚀 Active Simulation", "📊 Global System Diagnostics"])
+# Updated Tab Names
+tab1, tab2 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics"])
 
 with tab1:
     st.title("🚀 Active Simulation")
@@ -186,5 +187,6 @@ with tab2:
                 rows.append(row_data)
         
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
+
 
 
