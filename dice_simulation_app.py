@@ -2,13 +2,29 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from collections import defaultdict
+import json
+import os
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
-# --- Persistent Data Storage (Session-Based) ---
+# --- Persistent Storage Simulation ---
+# In a local environment, we use a JSON file to keep data even after the browser closes.
+DB_FILE = "user_data_storage.json"
+
+def load_db():
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_db(db):
+    with open(DB_FILE, "w") as f:
+        json.dump(db, f)
+
+# Initialize Session State Database
 if 'user_db' not in st.session_state:
-    st.session_state.user_db = {}  # Store: {username: {"password": pwd, "history": [], "stations": []}}
+    st.session_state.user_db = load_db()
 
 if 'authenticated_user' not in st.session_state:
     st.session_state.authenticated_user = None
@@ -17,34 +33,34 @@ if 'authenticated_user' not in st.session_state:
 def auth_gateway():
     st.title("🔐 Production Simulation Gateway")
     
-    # Toggle between Login and Signup
+    
     auth_mode = st.radio("Select Mode:", ["Login", "Signup"], horizontal=True)
     
-    with st.container():
-        user_id = st.text_input("User ID (Username)")
-        pwd = st.text_input("Password", type="password")
-        
-        if auth_mode == "Signup":
-            if st.button("Create Account"):
-                if not user_id or not pwd:
-                    st.warning("Please provide both User ID and Password.")
-                elif user_id in st.session_state.user_db:
-                    # STRICT RULE: ONE SIGNUP ONLY PER USERID
-                    st.error(f"User ID '{user_id}' is already registered. Please switch to 'Login' mode.")
+    user_id = st.text_input("User ID (Unique Username)")
+    pwd = st.text_input("Password", type="password")
+    
+    if auth_mode == "Signup":
+        st.info("Note: Your User ID must be unique. You can only sign up once.")
+        if st.button("Create Account"):
+            if user_id in st.session_state.user_db:
+                st.error(f"User ID '{user_id}' is already taken. Please choose a different name or login.")
+            elif user_id and pwd:
+                st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": []}
+                save_db(st.session_state.user_db)
+                st.success("Account created! Please switch to Login mode.")
+            else:
+                st.warning("Fields cannot be empty.")
+                
+    elif auth_mode == "Login":
+        if st.button("Sign In"):
+            if user_id in st.session_state.user_db:
+                if st.session_state.user_db[user_id]["password"] == pwd:
+                    st.session_state.authenticated_user = user_id
+                    st.rerun()
                 else:
-                    st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": []}
-                    st.success("Account created successfully! Now, please switch to 'Login' mode to enter.")
-                    
-        elif auth_mode == "Login":
-            if st.button("Sign In"):
-                if user_id in st.session_state.user_db:
-                    if st.session_state.user_db[user_id]["password"] == pwd:
-                        st.session_state.authenticated_user = user_id
-                        st.rerun()
-                    else:
-                        st.error("Invalid password.")
-                else:
-                    st.error("User ID not found. Please Signup first.")
+                    st.error("Incorrect password.")
+            else:
+                st.error("User ID not found. Please Signup first.")
 
 # Check Authentication
 if st.session_state.authenticated_user is None:
@@ -55,35 +71,27 @@ if st.session_state.authenticated_user is None:
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
-# --- Sidebar: User Controls & Settings ---
-st.sidebar.header(f"👤 User: {current_user}")
-
-# LOGOUT
-if st.sidebar.button("🚪 Logout"):
+# --- Sidebar: User Controls ---
+st.sidebar.header(f"👤 Active: {current_user}")
+if st.sidebar.button("🚪 Logout & Exit"):
     st.session_state.authenticated_user = None
     st.rerun()
 
 st.sidebar.markdown("---")
-
-# CLEAR HISTORY
 st.sidebar.subheader("Data Management")
 if st.sidebar.button("🗑️ Clear Whole History"):
     user_record["history"] = []
     user_record["stations"] = []
-    st.sidebar.success("All history for this user has been wiped.")
+    save_db(st.session_state.user_db)
     st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.header("Simulation Settings")
-num_members = st.sidebar.number_input("Workstations", min_value=2, value=8)
-num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
+num_members = st.sidebar.number_input("Workstations", min_value=2, value=7)
+num_days = st.sidebar.number_input("Days", min_value=1, value=25)
 
 members = [chr(64 + i) for i in range(1, num_members + 1)]
-
-# Dice Range Inputs
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members}
-
-# WIP Inputs
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
@@ -144,7 +152,7 @@ with tab1:
 
         results_df = pd.DataFrame(history).set_index("Day")
 
-        # --- Display Outputs (Requested Order) ---
+        # --- Display Outputs ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
@@ -152,16 +160,17 @@ with tab1:
         st.dataframe(results_df.drop(columns=["Daily_FG"]), use_container_width=True)
 
         scen_id = len(user_record["history"]) + 1
-        st.subheader(f"🏁 Current Results: Scenario #{scen_id}")
+        st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Finished Goods", int(total_fg))
-        c2.metric("Mean Throughput (T)", round(total_fg / num_days, 2))
+        c2.metric("Throughput (T)", round(total_fg / num_days, 2))
         c3.metric("Avg Total WIP (W)", round(results_df["Daily_Total_WIP"].mean(), 2))
 
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
+        
 
-        # --- Logging to Record ---
+        # --- Logging and Persistent Save ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         wip_init = list(initial_wip.values())[0] if initial_wip else 0
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
@@ -185,9 +194,12 @@ with tab1:
                 "Tot Output": sum(st_output[m]), "Avg WIP": round(np.mean(st_wip_trend[pair]), 2) if pair in st_wip_trend else 0,
                 "Entropy Hi": round(h_val, 3), "Interpretation": "Variable" if h_val > 2.4 else "Stable"
             })
+        
+        save_db(st.session_state.user_db) # Save to file
 
 with tab2:
     st.title("📊 Strategic Performance Analytics")
+    
     if user_record["history"]:
         st.subheader("Table A: Global Summary History")
         st.table(pd.DataFrame(user_record["history"]).set_index("Scenarios"))
@@ -208,4 +220,3 @@ with tab2:
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
     else:
         st.info("No recorded history found for this User ID.")
-
