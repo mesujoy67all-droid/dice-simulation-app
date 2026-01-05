@@ -2,33 +2,83 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from collections import defaultdict
-import io
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
-# Initialize Session States
-if 'user_name' not in st.session_state:
-    st.session_state.user_name = ""
-if 'scenario_history' not in st.session_state:
-    st.session_state.scenario_history = []
-if 'station_history' not in st.session_state:
-    st.session_state.station_history = []
+# --- Persistent Data Storage (Simulation of a Database) ---
+# In a real app, this would be a database or a file. 
+# Here we use st.session_state to track "Registered Users" for the current browser session.
+if 'user_db' not in st.session_state:
+    st.session_state.user_db = {}  # Format: {username: {"password": pwd, "history": [], "stations": []}}
 
-# --- Sidebar: Simulation Settings & Reset ---
+if 'current_user' not in st.session_state:
+    st.session_state.current_user = None
+
+# --- Login Logic ---
+def login_page():
+    st.title("🔐 Production Simulation Login")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Login / Create Account")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        
+        if st.button("Access Simulation"):
+            if username and password:
+                if username in st.session_state.user_db:
+                    # Check Password
+                    if st.session_state.user_db[username]["password"] == password:
+                        st.session_state.current_user = username
+                        st.success(f"Welcome back, {username}!")
+                        st.rerun()
+                    else:
+                        st.error("Incorrect password.")
+                else:
+                    # Create New User
+                    st.session_state.user_db[username] = {
+                        "password": password,
+                        "history": [],
+                        "stations": []
+                    }
+                    st.session_state.current_user = username
+                    st.success(f"Account created for {username}!")
+                    st.rerun()
+            else:
+                st.warning("Please enter both username and password.")
+
+if st.session_state.current_user is None:
+    login_page()
+    st.stop()
+
+# --- Load User Data ---
+user_data = st.session_state.user_db[st.session_state.current_user]
+
+# --- Sidebar: Simulation Settings & User Control ---
+st.sidebar.header(f"👤 User: {st.session_state.current_user}")
+
+if st.sidebar.button("🚪 Logout"):
+    st.session_state.current_user = None
+    st.rerun()
+
+st.sidebar.markdown("---")
 st.sidebar.header("Control Panel")
 
-if st.sidebar.button("🗑️ Reset All Session Data"):
-    st.session_state.scenario_history = []
-    st.session_state.station_history = []
+# Reset specific to this user
+if st.sidebar.button("🗑️ Start New Session (Clear History)"):
+    user_data["history"] = []
+    user_data["stations"] = []
+    st.success("History cleared for this session.")
     st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.header("Simulation Settings")
-num_members = st.sidebar.number_input("Number of Workstations", min_value=2, value=8, step=1)
-num_days = st.sidebar.number_input("Number of Days", min_value=1, value=1000, step=1)
+num_members = st.sidebar.number_input("Number of Workstations", min_value=2, value=7, step=1)
+num_days = st.sidebar.number_input("Number of Days", min_value=1, value=25, step=1)
 
-members = [chr(64 + i) for i in range(1, num_members + 1)] # A, B, C...
+members = [chr(64 + i) for i in range(1, num_members + 1)]
 
 st.sidebar.subheader("Dice Range per Member")
 dice_configs = {}
@@ -48,22 +98,11 @@ def calculate_entropy(values):
     p = counts / counts.sum()
     return -np.sum(p * np.log2(p))
 
-# 1. Login Screen
-if not st.session_state.user_name:
-    st.title("🎲 Dice-Based Production Simulation")
-    name_input = st.text_input("Enter your name to start:")
-    if st.button("Start Session"):
-        if name_input:
-            st.session_state.user_name = name_input
-            st.rerun()
-    st.stop()
-
 # --- Navigation Tabs ---
-# Updated Tab Names
 tab1, tab2 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics"])
 
 with tab1:
-    st.title("🚀 Active Simulation")
+    st.title("🚀 Live Operations Console")
 
     if st.sidebar.button("▶ Run Simulation & Record"):
         # 1. Capacity Generation
@@ -84,18 +123,18 @@ with tab1:
             daily_fg = 0
             for i, m in enumerate(members):
                 roll = day_rolls[m]
-                if i == 0: # Entry station
+                if i == 0:
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     wip_buffers[nxt] += roll
                     station_output_data[m].append(roll)
-                elif i == len(members) - 1: # Exit station
+                elif i == len(members) - 1:
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     daily_fg = move
                     total_finished_goods += move
                     station_output_data[m].append(move)
-                else: # Mid station
+                else:
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     move = min(roll, wip_buffers[prv])
@@ -107,9 +146,7 @@ with tab1:
                 pair = key.replace("WIP_", "")
                 buffer_levels_over_time[pair].append(val)
 
-            day_record = {"Day": day, **wip_buffers.copy()}
-            day_record["Daily_Total_WIP"] = sum(wip_buffers.values())
-            day_record["Daily_FG"] = daily_fg
+            day_record = {"Day": day, **wip_buffers.copy(), "Daily_Total_WIP": sum(wip_buffers.values()), "Daily_FG": daily_fg}
             history.append(day_record)
 
         results_df = pd.DataFrame(history).set_index("Day")
@@ -121,7 +158,7 @@ with tab1:
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(results_df.drop(columns=["Daily_FG"]), use_container_width=True)
 
-        scen_count = len(st.session_state.scenario_history) + 1
+        scen_count = len(user_data["history"]) + 1
         st.subheader(f"🏁 Current Results: Scenario #{scen_count}")
         m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.metric("Total Finished Goods", int(total_finished_goods))
@@ -132,14 +169,12 @@ with tab1:
         st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
 
         # --- Logging for Page 2 ---
-        scen_label = "Base-4" if not st.session_state.scenario_history else f"Scenario #{len(st.session_state.scenario_history)}"
-        
-        # Build the dynamic Initial WIP & Dice Range string
+        scen_label = "Base-4" if not user_data["history"] else f"Scenario #{len(user_data['history'])}"
         wip_val = list(initial_wip.values())[0] if initial_wip else 0
         dice_str = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         combined_config = f"WIP={wip_val} | {dice_str}"
 
-        st.session_state.scenario_history.append({
+        user_data["history"].append({
             "Scenarios": scen_label,
             "Initial WIP & Dice Range": combined_config,
             "Total Finished Goods": int(total_finished_goods),
@@ -154,7 +189,7 @@ with tab1:
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
             avg_wip = np.mean(buffer_levels_over_time[pair]) if pair in buffer_levels_over_time else 0
             h_i = calculate_entropy(station_output_data[m])
-            st.session_state.station_history.append({
+            user_data["stations"].append({
                 "Scenario": scen_label,
                 "Station": f"Station {pair}",
                 "Dice Range": f"{dice_configs[m][0]}-{dice_configs[m][1]}",
@@ -165,16 +200,15 @@ with tab1:
             })
 
 with tab2:
-    st.title("📊 Global System Diagnostics")
-    if st.session_state.scenario_history:
+    st.title("📊 Strategic Performance Analytics")
+    if user_data["history"]:
         st.subheader("Table A: Global Summary")
-        # Ensure the column rename is reflected here
-        st.table(pd.DataFrame(st.session_state.scenario_history).set_index("Scenarios"))
+        st.table(pd.DataFrame(user_data["history"]).set_index("Scenarios"))
         
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
         
-        s_df = pd.DataFrame(st.session_state.station_history)
+        s_df = pd.DataFrame(user_data["stations"])
         metrics = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
         
         rows = []
@@ -187,6 +221,5 @@ with tab2:
                 rows.append(row_data)
         
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
-
-
-
+    else:
+        st.info("No data recorded yet. Please run a simulation in the 'Live Operations Console'.")
