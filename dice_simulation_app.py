@@ -18,7 +18,6 @@ if 'station_history' not in st.session_state:
 # --- Sidebar: Simulation Settings & Reset ---
 st.sidebar.header("Control Panel")
 
-# 1. Moved Reset Button to Sidebar Top Right Area
 if st.sidebar.button("🗑️ Reset All Session Data"):
     st.session_state.scenario_history = []
     st.session_state.station_history = []
@@ -49,7 +48,7 @@ def calculate_entropy(values):
     p = counts / counts.sum()
     return -np.sum(p * np.log2(p))
 
-# 1. Login Screen (if name not set)
+# 1. Login Screen
 if not st.session_state.user_name:
     st.title("🎲 Dice-Based Production Simulation")
     name_input = st.text_input("Enter your name to start:")
@@ -64,7 +63,6 @@ tab1, tab2 = st.tabs(["🚀 Active Simulation", "📊 Global System Diagnostics"
 
 with tab1:
     st.title("🚀 Active Simulation")
-    # Pre-Day 1 Configuration metrics removed as requested
 
     if st.sidebar.button("▶ Run Simulation & Record"):
         # 1. Capacity Generation
@@ -115,17 +113,13 @@ with tab1:
 
         results_df = pd.DataFrame(history).set_index("Day")
 
-        # --- Page 1 Ordered Output ---
-        
-        # A. Table of Dice Rolls (Capacity)
+        # --- Page 1 Display Order ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
-        # B. WIP Table
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(results_df.drop(columns=["Daily_FG"]), use_container_width=True)
 
-        # C. Total Finished Goods Summary
         scen_count = len(st.session_state.scenario_history) + 1
         st.subheader(f"🏁 Current Results: Scenario #{scen_count}")
         m_col1, m_col2, m_col3 = st.columns(3)
@@ -133,15 +127,20 @@ with tab1:
         m_col2.metric("Mean Throughput (T)", round(total_finished_goods / num_days, 2))
         m_col3.metric("Avg Total WIP (W)", round(results_df["Daily_Total_WIP"].mean(), 2))
 
-        # D. Graphs
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
 
-        # --- Internal Logging for Page 2 ---
+        # --- Logging for Page 2 ---
         scen_label = "Base-4" if not st.session_state.scenario_history else f"Scenario #{len(st.session_state.scenario_history)}"
+        
+        # Build the dynamic Initial WIP & Dice Range string
+        wip_val = list(initial_wip.values())[0] if initial_wip else 0
+        dice_str = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
+        combined_config = f"WIP={wip_val} | {dice_str}"
+
         st.session_state.scenario_history.append({
             "Scenarios": scen_label,
-            "Initial WIP": f"WIP={list(initial_wip.values())[0]}, Range {dice_configs['A'][0]}-{dice_configs['A'][1]}",
+            "Initial WIP & Dice Range": combined_config,
             "Total Finished Goods": int(total_finished_goods),
             "Mean Throughput (T)": round(total_finished_goods / num_days, 2),
             "Total WIP (W)": round(results_df["Daily_Total_WIP"].mean(), 2),
@@ -168,6 +167,7 @@ with tab2:
     st.title("📊 Global System Diagnostics")
     if st.session_state.scenario_history:
         st.subheader("Table A: Global Summary")
+        # Ensure the column rename is reflected here
         st.table(pd.DataFrame(st.session_state.scenario_history).set_index("Scenarios"))
         
         st.markdown("---")
@@ -186,5 +186,3 @@ with tab2:
                 rows.append(row_data)
         
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
-    else:
-        st.info("Run a simulation in Tab 1 to generate diagnostics.")
