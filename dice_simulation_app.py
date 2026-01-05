@@ -2,29 +2,15 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from collections import defaultdict
-import json
-import os
+import io
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
-# --- Persistent Storage Simulation ---
-# In a local environment, we use a JSON file to keep data even after the browser closes.
-DB_FILE = "user_data_storage.json"
-
-def load_db():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
-            return json.load(f)
-    return {}
-
-def save_db(db):
-    with open(DB_FILE, "w") as f:
-        json.dump(db, f)
-
-# Initialize Session State Database
+# --- User Database Simulation ---
+# Note: For Streamlit Cloud, session_state resets when the app is idle.
 if 'user_db' not in st.session_state:
-    st.session_state.user_db = load_db()
+    st.session_state.user_db = {} 
 
 if 'authenticated_user' not in st.session_state:
     st.session_state.authenticated_user = None
@@ -33,20 +19,18 @@ if 'authenticated_user' not in st.session_state:
 def auth_gateway():
     st.title("🔐 Production Simulation Gateway")
     
-    
     auth_mode = st.radio("Select Mode:", ["Login", "Signup"], horizontal=True)
     
     user_id = st.text_input("User ID (Unique Username)")
     pwd = st.text_input("Password", type="password")
     
     if auth_mode == "Signup":
-        st.info("Note: Your User ID must be unique. You can only sign up once.")
+        st.info("Your User ID must be unique. You can only sign up once.")
         if st.button("Create Account"):
             if user_id in st.session_state.user_db:
-                st.error(f"User ID '{user_id}' is already taken. Please choose a different name or login.")
+                st.error(f"User ID '{user_id}' is already taken.")
             elif user_id and pwd:
                 st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": []}
-                save_db(st.session_state.user_db)
                 st.success("Account created! Please switch to Login mode.")
             else:
                 st.warning("Fields cannot be empty.")
@@ -60,9 +44,8 @@ def auth_gateway():
                 else:
                     st.error("Incorrect password.")
             else:
-                st.error("User ID not found. Please Signup first.")
+                st.error("User ID not found.")
 
-# Check Authentication
 if st.session_state.authenticated_user is None:
     auth_gateway()
     st.stop()
@@ -82,7 +65,6 @@ st.sidebar.subheader("Data Management")
 if st.sidebar.button("🗑️ Clear Whole History"):
     user_record["history"] = []
     user_record["stations"] = []
-    save_db(st.session_state.user_db)
     st.rerun()
 
 st.sidebar.markdown("---")
@@ -168,9 +150,8 @@ with tab1:
 
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
-        
 
-        # --- Logging and Persistent Save ---
+        # --- Logging ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         wip_init = list(initial_wip.values())[0] if initial_wip else 0
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
@@ -194,12 +175,9 @@ with tab1:
                 "Tot Output": sum(st_output[m]), "Avg WIP": round(np.mean(st_wip_trend[pair]), 2) if pair in st_wip_trend else 0,
                 "Entropy Hi": round(h_val, 3), "Interpretation": "Variable" if h_val > 2.4 else "Stable"
             })
-        
-        save_db(st.session_state.user_db) # Save to file
 
 with tab2:
     st.title("📊 Strategic Performance Analytics")
-    
     if user_record["history"]:
         st.subheader("Table A: Global Summary History")
         st.table(pd.DataFrame(user_record["history"]).set_index("Scenarios"))
