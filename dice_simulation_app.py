@@ -95,23 +95,22 @@ with tab1:
                     station_output[m].append(move)
 
             for key, val in wip_buffers.items():
-                recv_station = key.split("_")[1][1]
-                station_wip_history[recv_station].append(val)
+                pair = key.split("_")[1]
+                station_wip_history[pair].append(val)
 
             rec = {"Day": day, **wip_buffers.copy(), "Daily_Total_WIP": sum(wip_buffers.values())}
             history.append(rec)
 
         results_df = pd.DataFrame(history).set_index("Day")
         
-        # Calculate Scenario Label
         scen_count = len(st.session_state.scenario_history)
         scen_label = "Base-4" if scen_count == 0 else f"Scenario #{scen_count}"
         
-        # Global Metrics Calculation
         t_put = total_finished_goods / num_days
         avg_wip_total = results_df["Daily_Total_WIP"].mean()
         station_entropies = [entropy(station_output[m]) for m in members]
         
+        # Table A Entry
         st.session_state.scenario_history.append({
             "Scenarios": scen_label,
             "Initial WIP": f"WIP={list(initial_wip.values())[0] if initial_wip else 0}, Range {dice_configs['A'][0]}-{dice_configs['A'][1]}",
@@ -123,13 +122,18 @@ with tab1:
             "Entropy Spread σH": round(np.std(station_entropies), 3)
         })
 
-        # Save Station-Level Diagnostics for Table B
+        # Table B Entry (Detailed Metrics)
         for m in members:
-            avg_station_wip = np.mean(station_wip_history[m]) if m in station_wip_history else 0
+            # Match station to its corresponding WIP pair (e.g. B -> AB)
+            current_pair = next((k.split("_")[1] for k in wip_keys if k.endswith(m)), m)
+            avg_station_wip = np.mean(station_wip_history[current_pair]) if current_pair in station_wip_history else 0
             h_i = entropy(station_output[m])
+            dice_range_str = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
+            
             st.session_state.station_history.append({
                 "Scenario": scen_label,
-                "Station": f"Station {m}",
+                "Station": f"Station {current_pair}",
+                "Dice Range": dice_range_str,
                 "Tot Output": sum(station_output[m]),
                 "Avg WIP": round(avg_station_wip, 2),
                 "Entropy Hi": round(h_i, 3),
@@ -147,39 +151,33 @@ with tab2:
         st.markdown("---")
         st.subheader("📊 Table B: Station-Level Flow Diagnostics (Multi-Scenario)")
         
-        # Create Transposed Table B as per the reference image
         if st.session_state.station_history:
             s_df = pd.DataFrame(st.session_state.station_history)
-            
-            # Use pivot to create the row-grouped structure
-            table_b_transposed = s_df.pivot(index=['Scenario', 'Station'], columns=[], values=['Tot Output', 'Avg WIP', 'Entropy Hi', 'Interpretation'])
-            
-            # We recreate the layout manually for better visual matching of the provided image
-            rows = []
             unique_scenarios = s_df['Scenario'].unique()
-            metrics = ["Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
-            
+            # Added "Dice Range" back to the metrics list
+            metrics = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
+            all_station_labels = s_df['Station'].unique()
+
+            rows = []
             for scen in unique_scenarios:
                 for metric in metrics:
                     row_data = {"Scenario": scen, "Metric": metric}
-                    for m in members:
-                        val = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == f"Station {m}")][metric].values[0]
-                        row_data[f"Station {m}"] = val
+                    for s_label in all_station_labels:
+                        filtered = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
+                        row_data[s_label] = filtered[metric].values[0] if not filtered.empty else "N/A"
                     rows.append(row_data)
             
             final_table_b = pd.DataFrame(rows)
             st.dataframe(final_table_b, use_container_width=True, hide_index=True)
-            
-            st.info("Note: Table B decomposes results to the station level. This view highlights where congestion and uncertainty concentrate.")
 
-        # Download
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             pd.DataFrame(st.session_state.scenario_history).to_excel(writer, sheet_name='Table_A', index=False)
-            final_table_b.to_excel(writer, sheet_name='Table_B', index=False)
-        st.download_button("📥 Download All Tables (.xlsx)", data=output.getvalue(), file_name="production_diagnostics.xlsx")
+            if st.session_state.station_history:
+                final_table_b.to_excel(writer, sheet_name='Table_B', index=False)
+        st.download_button("📥 Download Full Report (.xlsx)", data=output.getvalue(), file_name="production_diagnostics.xlsx")
     else:
-        st.info("No data yet.")
+        st.info("No scenarios recorded yet.")
 
 if st.button("Reset Session"):
     st.session_state.scenario_history = []
