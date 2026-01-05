@@ -6,16 +6,14 @@ from collections import defaultdict
 # --- Page Configuration ---
 st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
-# --- Persistent Data Storage ---
-# In a real-world scenario, this would be a database. 
-# Here, we use st.session_state to simulate a user database for the current browser session.
+# --- Persistent Data Storage (Session-Based) ---
 if 'user_db' not in st.session_state:
-    st.session_state.user_db = {}  # {username: {"password": pwd, "history": [], "stations": []}}
+    st.session_state.user_db = {}  # Store: {username: {"password": pwd, "history": [], "stations": []}}
 
 if 'authenticated_user' not in st.session_state:
     st.session_state.authenticated_user = None
 
-# --- Login & Signup System ---
+# --- Authentication Gateway ---
 def auth_gateway():
     st.title("🔐 Production Simulation Gateway")
     
@@ -29,12 +27,12 @@ def auth_gateway():
         if auth_mode == "Signup":
             if st.button("Create Account"):
                 if user_id in st.session_state.user_db:
-                    st.error("User ID already exists. Please choose another or Login.")
+                    st.error("User ID already exists. Please login.")
                 elif user_id and pwd:
                     st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": []}
-                    st.success("Account created successfully! You can now Login.")
+                    st.success("Account created successfully! Please switch to Login mode.")
                 else:
-                    st.warning("Please fill in all fields.")
+                    st.warning("Please provide both User ID and Password.")
                     
         elif auth_mode == "Login":
             if st.button("Sign In"):
@@ -45,37 +43,46 @@ def auth_gateway():
                     else:
                         st.error("Invalid password.")
                 else:
-                    st.error("User ID not found. Please Signup first.")
+                    st.error("User ID not found. Please Signup.")
 
 # Check Authentication
 if st.session_state.authenticated_user is None:
     auth_gateway()
     st.stop()
 
-# --- Load Authenticated User Data ---
+# --- Access Current User's Data ---
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
 # --- Sidebar: User Controls & Settings ---
-st.sidebar.header(f"👤 Active: {current_user}")
+st.sidebar.header(f"👤 User: {current_user}")
+
+# LOGOUT
 if st.sidebar.button("🚪 Logout"):
     st.session_state.authenticated_user = None
     st.rerun()
 
 st.sidebar.markdown("---")
-if st.sidebar.button("🗑️ Clear My History"):
+
+# CLEAR HISTORY (Requested Feature)
+st.sidebar.subheader("Data Management")
+if st.sidebar.button("🗑️ Clear Whole History"):
     user_record["history"] = []
     user_record["stations"] = []
+    st.sidebar.success("All history has been cleared.")
     st.rerun()
 
+st.sidebar.markdown("---")
 st.sidebar.header("Simulation Settings")
 num_members = st.sidebar.number_input("Workstations", min_value=2, value=8)
 num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
 
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 
-# Dice & WIP Configs
+# Dice Range Inputs
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members}
+
+# WIP Inputs
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
@@ -98,7 +105,7 @@ with tab1:
         df_dice.index = range(1, num_days + 1)
         df_dice.index.name = "Day"
 
-        # 2. Logic Execution
+        # 2. Simulation Logic
         wip_buffers = initial_wip.copy()
         history = []
         total_fg = 0
@@ -137,23 +144,24 @@ with tab1:
         results_df = pd.DataFrame(history).set_index("Day")
 
         # --- Display Outputs ---
-        st.subheader("🎲 Daily Dice Rolls")
+        st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
-        st.subheader("📦 WIP Levels")
+        st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(results_df.drop(columns=["Daily_FG"]), use_container_width=True)
 
         scen_id = len(user_record["history"]) + 1
-        st.subheader(f"🏁 Scenario #{scen_id} Results")
+        st.subheader(f"🏁 Current Results: Scenario #{scen_id}")
         c1, c2, c3 = st.columns(3)
-        c1.metric("Finished Goods", int(total_fg))
-        c2.metric("Throughput (T)", round(total_fg / num_days, 2))
-        c3.metric("Avg WIP (W)", round(results_df["Daily_Total_WIP"].mean(), 2))
+        c1.metric("Total Finished Goods", int(total_fg))
+        c2.metric("Mean Throughput (T)", round(total_fg / num_days, 2))
+        c3.metric("Avg Total WIP (W)", round(results_df["Daily_Total_WIP"].mean(), 2))
 
+        st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
 
-        # --- Logging to Persistent Record ---
-        scen_label = "Base-4" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
+        # --- Logging to Record ---
+        scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         wip_init = list(initial_wip.values())[0] if initial_wip else 0
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         
@@ -174,23 +182,24 @@ with tab1:
             user_record["stations"].append({
                 "Scenario": scen_label, "Station": f"Station {pair}", "Dice Range": f"{dice_configs[m][0]}-{dice_configs[m][1]}",
                 "Tot Output": sum(st_output[m]), "Avg WIP": round(np.mean(st_wip_trend[pair]), 2) if pair in st_wip_trend else 0,
-                "Entropy Hi": round(h_val, 3), "Interpretation": "High variability" if h_val > 2.4 else "Stable"
+                "Entropy Hi": round(h_val, 3), "Interpretation": "Variable" if h_val > 2.4 else "Stable"
             })
 
 with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
-        st.subheader("Table A: Historical Scenario Comparison")
+        st.subheader("Table A: Global Summary History")
         st.table(pd.DataFrame(user_record["history"]).set_index("Scenarios"))
         
         st.markdown("---")
-        st.subheader("Table B: Station Diagnostics")
+        st.subheader("Table B: Station-Level Flow Diagnostics")
         s_df = pd.DataFrame(user_record["stations"])
         metrics = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
         
         rows = []
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics):
+                # Row merging logic
                 row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
                 for s_label in s_df['Station'].unique():
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
@@ -198,4 +207,4 @@ with tab2:
                 rows.append(row_data)
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
     else:
-        st.info("No history found. Complete a run in the 'Live Operations Console' to record data.")
+        st.info("No recorded history found for this User ID. Complete a simulation to see diagnostics.")
