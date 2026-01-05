@@ -9,12 +9,11 @@ import io
 # -----------------------------------
 st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
-# -----------------------------------
-# User "Login" / Session Record Simulation
-# -----------------------------------
+# Initialize session state for the user name
 if 'user_name' not in st.session_state:
     st.session_state.user_name = ""
 
+# 1. Login Screen
 if not st.session_state.user_name:
     st.title("🔐 Access Production Simulation")
     name_input = st.text_input("Enter your name to start recording the session:")
@@ -27,15 +26,12 @@ if not st.session_state.user_name:
     st.stop()
 
 # -----------------------------------
-# Main App Headers
+# Main App UI
 # -----------------------------------
 st.title("🎲 Dice-Based Production Simulation Platform")
 st.markdown(f"**Current Operator:** {st.session_state.user_name} | **Status:** Recording Enabled")
-st.markdown("---")
 
-# -----------------------------------
-# Sidebar: Settings
-# -----------------------------------
+# Sidebar Settings
 st.sidebar.header("Simulation Settings")
 num_members = st.sidebar.number_input("Number of Workstations", min_value=2, value=7, step=1)
 num_days = st.sidebar.number_input("Number of Days", min_value=1, value=20, step=1)
@@ -52,12 +48,9 @@ st.sidebar.subheader("Initial WIP Buffers")
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 initial_wip = {}
 for key in wip_keys:
-    # Allows any value from 0 up, defaults to 4
     initial_wip[key] = st.sidebar.number_input(f"{key}", min_value=0, value=4, step=1)
 
-# -----------------------------------
 # Helper: Entropy Function
-# -----------------------------------
 def entropy(values):
     if len(values) == 0: return 0
     unique, counts = np.unique(values, return_counts=True)
@@ -68,7 +61,7 @@ def entropy(values):
 # Run Simulation
 # -----------------------------------
 if st.sidebar.button("▶ Run Simulation & Record"):
-    # 1. Generate Dice Capacity
+    # Generate Dice Capacity
     dice_data = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
     df_dice = pd.DataFrame(dice_data)
     df_dice.index += 1
@@ -76,7 +69,7 @@ if st.sidebar.button("▶ Run Simulation & Record"):
     st.subheader("🎲 Daily Capacity (Dice Rolls)")
     st.dataframe(df_dice, use_container_width=True)
 
-    # 2. Logic & Recording
+    # Logic & Recording
     wip_buffers = initial_wip.copy()
     history = []
     total_finished_goods = 0
@@ -116,45 +109,37 @@ if st.sidebar.button("▶ Run Simulation & Record"):
         history.append(rec)
 
     results_df = pd.DataFrame(history).set_index("Day")
-    
-    # 3. Tables and Visuals
     st.subheader("📊 Full Simulation Log")
     st.dataframe(results_df, use_container_width=True)
 
     # Table B: Diagnostics (AB, BC, CD format)
     table_b_rows = []
     for key in wip_keys:
-        pair = key.split("_")[1] # e.g., "AB"
-        recv = pair[1] # "B"
+        pair = key.split("_")[1] 
+        recv = pair[1]
         outputs, wips = station_output[recv], station_wip_history[recv]
         avg_w = np.mean(wips) if wips else 0
         h_i = entropy(outputs)
         
         interp = "High variability" if h_i > 2 else "Bottleneck" if avg_w > 8 else "Stable"
-        table_b_rows.append({
-            "Station Pair": pair, 
-            "Total Output": sum(outputs), 
-            "Avg WIP": round(avg_w, 2), 
-            "Entropy Hᵢ": round(h_i, 3), 
-            "Interpretation": interp
-        })
+        table_b_rows.append({"Station Pair": pair, "Total Output": sum(outputs), "Avg WIP": round(avg_w, 2), "Entropy Hᵢ": round(h_i, 3), "Interpretation": interp})
 
     st.subheader("📊 Table B: Station-Level Flow Diagnostics")
     st.dataframe(pd.DataFrame(table_b_rows), use_container_width=True)
 
-    # Download Button for Excel
+    # Excel Download Logic
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        results_df.to_excel(writer, sheet_name='Simulation_History')
+        results_df.to_excel(writer, sheet_name='History')
         pd.DataFrame(table_b_rows).to_excel(writer, sheet_name='Diagnostics')
     
     st.download_button(
-        label="📥 Download Simulation Results (.xlsx)",
+        label="📥 Download Excel Results",
         data=output.getvalue(),
-        file_name=f"simulation_{st.session_state.user_name}.xlsx",
+        file_name=f"dice_sim_{st.session_state.user_name}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    if st.button("Log Out / Clear Session"):
-        st.session_state.user_name = ""
-        st.rerun()
+if st.button("Log Out"):
+    st.session_state.user_name = ""
+    st.rerun()
