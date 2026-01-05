@@ -17,7 +17,6 @@ if 'authenticated_user' not in st.session_state:
 # --- Authentication Gateway ---
 def auth_gateway():
     st.title("🔐 Production Simulation Gateway")
-    
     auth_mode = st.radio("Select Mode:", ["Login", "Signup"], horizontal=True)
     
     user_id = st.text_input("User ID (Unique Username)")
@@ -129,13 +128,7 @@ with tab1:
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
 
-            # ADDED: explicitly tracking daily FG in history list
-            history.append({
-                "Day": day, 
-                **wip_buffers.copy(), 
-                "Daily_Total_WIP": sum(wip_buffers.values()), 
-                "Day-wise Total FG": daily_fg_out  # New column added here
-            })
+            history.append({"Day": day, **wip_buffers.copy(), "Daily_Total_WIP": sum(wip_buffers.values()), "Day Wise Total FG": daily_fg_out})
 
         results_df = pd.DataFrame(history).set_index("Day")
 
@@ -143,7 +136,8 @@ with tab1:
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
-        st.subheader("📦 Work-In-Progress (WIP) & Daily Output History")
+        st.subheader("📦 Work-In-Progress (WIP) History")
+        # Column "Day Wise Total FG" is now included in the dataframe display
         st.dataframe(results_df, use_container_width=True)
 
         scen_id = len(user_record["history"]) + 1
@@ -154,7 +148,7 @@ with tab1:
         c3.metric("Avg Total WIP (W)", round(results_df["Daily_Total_WIP"].mean(), 2))
 
         st.subheader("📈 Performance Trends")
-        st.line_chart(results_df[["Daily_Total_WIP", "Day-wise Total FG"]])
+        st.line_chart(results_df[["Daily_Total_WIP", "Day Wise Total FG"]])
 
         # --- Logging ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
@@ -184,7 +178,6 @@ with tab1:
 with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
-        # Prepare Dataframes
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
         
         s_df = pd.DataFrame(user_record["stations"])
@@ -199,7 +192,6 @@ with tab2:
                 rows.append(row_data)
         df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
 
-        # Display Tables
         st.subheader("Table A: Global Summary History")
         st.table(df_table_a)
         
@@ -207,7 +199,6 @@ with tab2:
         st.subheader("Table B: Station-Level Flow Diagnostics")
         st.table(df_table_b)
 
-        # Excel Download Logic
         st.markdown("---")
         st.subheader("📥 Export Analytics")
         
