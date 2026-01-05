@@ -8,7 +8,6 @@ import io
 st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
 # --- User Database Simulation ---
-# Note: For Streamlit Cloud, session_state resets when the app is idle.
 if 'user_db' not in st.session_state:
     st.session_state.user_db = {} 
 
@@ -179,14 +178,11 @@ with tab1:
 with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
-        st.subheader("Table A: Global Summary History")
-        st.table(pd.DataFrame(user_record["history"]).set_index("Scenarios"))
+        # Prepare Dataframes
+        df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
         
-        st.markdown("---")
-        st.subheader("Table B: Station-Level Flow Diagnostics")
         s_df = pd.DataFrame(user_record["stations"])
         metrics = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
-        
         rows = []
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics):
@@ -195,7 +191,32 @@ with tab2:
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
                     row_data[s_label] = subset[metric].values[0] if not subset.empty else ""
                 rows.append(row_data)
-        st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
+        df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
+
+        # Display Tables
+        st.subheader("Table A: Global Summary History")
+        st.table(df_table_a)
+        
+        st.markdown("---")
+        st.subheader("Table B: Station-Level Flow Diagnostics")
+        st.table(df_table_b)
+
+        # --- Excel Download Logic ---
+        st.markdown("---")
+        st.subheader("📥 Export Analytics")
+        
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_table_a.to_excel(writer, sheet_name='Global Summary')
+            # Reset index for Table B to ensure Scenario/Metric headers appear in Excel
+            df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
+            
+        excel_data = output.getvalue()
+        st.download_button(
+            label="Download Analytics as Excel",
+            data=excel_data,
+            file_name=f"Simulation_Analytics_{current_user}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
     else:
         st.info("No recorded history found for this User ID.")
-
