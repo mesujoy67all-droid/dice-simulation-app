@@ -25,7 +25,7 @@ if st.sidebar.button("🗑️ Reset All Session Data"):
 
 st.sidebar.markdown("---")
 st.sidebar.header("Simulation Settings")
-num_members = st.sidebar.number_input("Number of Workstations", min_value=2, value=7, step=1)
+num_members = st.sidebar.number_input("Number of Workstations", min_value=2, value=8, step=1)
 num_days = st.sidebar.number_input("Number of Days", min_value=1, value=1000, step=1)
 
 members = [chr(64 + i) for i in range(1, num_members + 1)] # A, B, C...
@@ -186,4 +186,5 @@ with tab2:
                 rows.append(row_data)
         
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
+
 
