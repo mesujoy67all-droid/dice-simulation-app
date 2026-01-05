@@ -8,6 +8,8 @@ import io
 st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
 # --- User Database Simulation ---
+# NOTE: For Web permanence, use the Supabase or GSheets method discussed earlier.
+# This keeps the session logic for now to fix the current crash.
 if 'user_db' not in st.session_state:
     st.session_state.user_db = {} 
 
@@ -156,7 +158,7 @@ with tab1:
         c3.metric("Total WIP (Sum)", sum_total_wip)
 
         st.subheader("📈 Performance Trends")
-        # Graph: Daily WIP load vs Cumulative growth of Finished Goods
+        # Graph: Daily WIP vs Cumulative growth of Finished Goods
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
         # --- Logging ---
@@ -176,7 +178,11 @@ with tab1:
         })
 
         for m in members:
+            # Logic to remove Station A: we check if this member is the first station
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
+            if pair == "A" or pair == members[0]:
+                continue # Skip adding Station A to the diagnostics log
+                
             h_val = calculate_entropy(st_output[m])
             user_record["stations"].append({
                 "Scenario": scen_label, "Station": f"Station {pair}", "Dice Range": f"{dice_configs[m][0]}-{dice_configs[m][1]}",
@@ -192,20 +198,24 @@ with tab2:
         s_df = pd.DataFrame(user_record["stations"])
         metrics = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
         rows = []
+        
+        # Build Table B without Station A
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics):
                 row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
+                # Station list will naturally exclude 'Station A' because it wasn't logged above
                 for s_label in s_df['Station'].unique():
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
                     row_data[s_label] = subset[metric].values[0] if not subset.empty else ""
                 rows.append(row_data)
+        
         df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
 
         st.subheader("Table A: Global Summary History")
         st.table(df_table_a)
         
         st.markdown("---")
-        st.subheader("Table B: Station-Level Flow Diagnostics")
+        st.subheader("Table B: Station-Level Flow Diagnostics (Buffers Only)")
         st.table(df_table_b)
 
         st.markdown("---")
