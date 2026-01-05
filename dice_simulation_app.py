@@ -167,11 +167,19 @@ if st.sidebar.button("▶ Run Simulation"):
     st.subheader("📈 Performance Trends")
     st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
 
-    # 6. TABLE B: STATION-LEVEL FLOW DIAGNOSTICS
+# 6. TABLE B: STATION-LEVEL FLOW DIAGNOSTICS
     table_b_rows = []
-    for s in members:
-        outputs = station_output[s]
-        wips = station_wip_history[s]
+    
+    # We loop through the wip_keys (like WIP_AB, WIP_BC) to get the station pairs
+    for key in wip_keys:
+        # Extract the station names from the key (e.g., "WIP_AB" -> "AB")
+        station_pair = key.split("_")[1] 
+        
+        # For diagnostics, we look at the station receiving the inventory (the second letter)
+        receiving_station = station_pair[1]
+        
+        outputs = station_output[receiving_station]
+        wips = station_wip_history[receiving_station]
         
         avg_wip = np.mean(wips) if wips else 0
         H_i = entropy(outputs)
@@ -184,7 +192,7 @@ if st.sidebar.button("▶ Run Simulation"):
             interpretation = "Stable"
 
         table_b_rows.append({
-            "Station": s,
+            "Station Pair": station_pair, # This will now show AB, BC, CD, etc.
             "Total Output": sum(outputs),
             "Avg WIP": round(avg_wip, 2),
             "Entropy Hᵢ": round(H_i, 3),
@@ -210,3 +218,4 @@ if st.sidebar.button("▶ Run Simulation"):
 
     st.subheader("📊 Table A: Global System Diagnostics")
     st.dataframe(table_A, use_container_width=True)
+
