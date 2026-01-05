@@ -155,9 +155,10 @@ with tab1:
         wip_init = list(initial_wip.values())[0] if initial_wip else 0
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         
+        # ADDING DAYS TO THE LOG COLUMN
         user_record["history"].append({
             "Scenarios": scen_label,
-            "Initial WIP & Dice Range": f"WIP={wip_init} | {dice_info}",
+            "Days, Initial WIP & Dice Range": f"Days={num_days} | WIP={wip_init} | {dice_info}",
             "Total Finished Goods": int(total_fg),
             "Mean Throughput (T)": round(total_fg / num_days, 2),
             "Total WIP (W)": round(results_df["Daily_Total_WIP"].mean(), 2),
@@ -201,14 +202,13 @@ with tab2:
         st.subheader("Table B: Station-Level Flow Diagnostics")
         st.table(df_table_b)
 
-        # --- Excel Download Logic ---
+        # Excel Download Logic
         st.markdown("---")
         st.subheader("📥 Export Analytics")
         
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_table_a.to_excel(writer, sheet_name='Global Summary')
-            # Reset index for Table B to ensure Scenario/Metric headers appear in Excel
             df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
             
         excel_data = output.getvalue()
