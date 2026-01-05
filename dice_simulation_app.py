@@ -15,17 +15,16 @@ if 'scenario_history' not in st.session_state:
 if 'station_history' not in st.session_state:
     st.session_state.station_history = []
 
-# 1. Login Screen
-if not st.session_state.user_name:
-    st.title("🔐 Access Production Simulation")
-    name_input = st.text_input("Enter your name to start recording:")
-    if st.button("Start Session"):
-        if name_input:
-            st.session_state.user_name = name_input
-            st.rerun()
-    st.stop()
+# --- Sidebar: Simulation Settings & Reset ---
+st.sidebar.header("Control Panel")
 
-# --- Sidebar: Simulation Settings ---
+# 1. Moved Reset Button to Sidebar Top Right Area
+if st.sidebar.button("🗑️ Reset All Session Data"):
+    st.session_state.scenario_history = []
+    st.session_state.station_history = []
+    st.rerun()
+
+st.sidebar.markdown("---")
 st.sidebar.header("Simulation Settings")
 num_members = st.sidebar.number_input("Number of Workstations", min_value=2, value=7, step=1)
 num_days = st.sidebar.number_input("Number of Days", min_value=1, value=25, step=1)
@@ -50,17 +49,22 @@ def calculate_entropy(values):
     p = counts / counts.sum()
     return -np.sum(p * np.log2(p))
 
+# 1. Login Screen (if name not set)
+if not st.session_state.user_name:
+    st.title("🎲 Dice-Based Production Simulation")
+    name_input = st.text_input("Enter your name to start:")
+    if st.button("Start Session"):
+        if name_input:
+            st.session_state.user_name = name_input
+            st.rerun()
+    st.stop()
+
 # --- Navigation Tabs ---
 tab1, tab2 = st.tabs(["🚀 Active Simulation", "📊 Global System Diagnostics"])
 
 with tab1:
-    st.title("🎲 Active Simulation")
-    
-    # Pre-Run Configuration Metrics
-    st.subheader("📋 Pre-Day 1 Configuration")
-    config_cols = st.columns(len(members))
-    for idx, m in enumerate(members):
-        config_cols[idx].metric(f"Member {m}", f"{dice_configs[m][0]}-{dice_configs[m][1]}")
+    st.title("🚀 Active Simulation")
+    # Pre-Day 1 Configuration metrics removed as requested
 
     if st.sidebar.button("▶ Run Simulation & Record"):
         # 1. Capacity Generation
@@ -101,7 +105,8 @@ with tab1:
                     station_output_data[m].append(move)
 
             for key, val in wip_buffers.items():
-                buffer_levels_over_time[key.replace("WIP_", "")].append(val)
+                pair = key.replace("WIP_", "")
+                buffer_levels_over_time[pair].append(val)
 
             day_record = {"Day": day, **wip_buffers.copy()}
             day_record["Daily_Total_WIP"] = sum(wip_buffers.values())
@@ -110,10 +115,9 @@ with tab1:
 
         results_df = pd.DataFrame(history).set_index("Day")
 
-        # --- Page 1 Display Order ---
-        st.markdown("---")
+        # --- Page 1 Ordered Output ---
         
-        # A. Table of Dice Rolls
+        # A. Table of Dice Rolls (Capacity)
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
@@ -121,8 +125,9 @@ with tab1:
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(results_df.drop(columns=["Daily_FG"]), use_container_width=True)
 
-        # C. Total Finished Goods (from your uploaded image design)
-        st.subheader(f"🏁 Current Results: Scenario #{len(st.session_state.scenario_history) + 1}")
+        # C. Total Finished Goods Summary
+        scen_count = len(st.session_state.scenario_history) + 1
+        st.subheader(f"🏁 Current Results: Scenario #{scen_count}")
         m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.metric("Total Finished Goods", int(total_finished_goods))
         m_col2.metric("Mean Throughput (T)", round(total_finished_goods / num_days, 2))
@@ -132,7 +137,7 @@ with tab1:
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
 
-        # --- Logging for Page 2 ---
+        # --- Internal Logging for Page 2 ---
         scen_label = "Base-4" if not st.session_state.scenario_history else f"Scenario #{len(st.session_state.scenario_history)}"
         st.session_state.scenario_history.append({
             "Scenarios": scen_label,
@@ -146,7 +151,6 @@ with tab1:
         })
 
         for m in members:
-            # Map station to its buffer (e.g., Station A metrics use buffer AB)
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
             avg_wip = np.mean(buffer_levels_over_time[pair]) if pair in buffer_levels_over_time else 0
             h_i = calculate_entropy(station_output_data[m])
@@ -183,9 +187,4 @@ with tab2:
         
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
     else:
-        st.info("No data recorded. Go to 'Active Simulation' and click Run.")
-
-if st.button("Reset All Data"):
-    st.session_state.scenario_history = []
-    st.session_state.station_history = []
-    st.rerun()
+        st.info("Run a simulation in Tab 1 to generate diagnostics.")
