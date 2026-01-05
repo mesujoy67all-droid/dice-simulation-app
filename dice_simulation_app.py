@@ -48,10 +48,11 @@ if st.session_state.authenticated_user is None:
     auth_gateway()
     st.stop()
 
+# --- Access Current User's Data ---
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
-# --- Sidebar ---
+# --- Sidebar: User Controls ---
 st.sidebar.header(f"👤 Active: {current_user}")
 if st.sidebar.button("🚪 Logout & Exit"):
     st.session_state.authenticated_user = None
@@ -87,11 +88,13 @@ with tab1:
     st.title("🚀 Live Operations Console")
     
     if st.sidebar.button("▶ Run & Save Simulation"):
+        # 1. Capacity Generation
         dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
         df_dice = pd.DataFrame(dice_rolls)
         df_dice.index = range(1, num_days + 1)
         df_dice.index.name = "Day"
 
+        # 2. Simulation Logic
         wip_buffers = initial_wip.copy()
         history = []
         total_fg = 0
@@ -134,27 +137,27 @@ with tab1:
 
         results_df = pd.DataFrame(history).set_index("Day")
         
-        # CUMULATIVE CALCULATIONS FOR GRAPH
-        results_df["Cumulative Total WIP"] = results_df["Daily_Total_WIP"].cumsum()
+        # Calculate Cumulative Finished Goods for the Graph
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
+        overall_total_wip = int(results_df["Daily_Total_WIP"].sum())
 
+        # --- Display Outputs ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
         st.subheader("📦 Work-In-Progress (WIP) History")
-        st.dataframe(results_df.drop(columns=["Cumulative Total WIP", "Cumulative FG"]), use_container_width=True)
+        st.dataframe(results_df, use_container_width=True)
 
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Finished Goods", int(total_fg))
         c2.metric("Throughput (T)", round(total_fg / num_days, 2))
-        # CHANGED: Replaced Avg Total WIP with Total WIP
-        c3.metric("Total WIP (W)", int(results_df["Daily_Total_WIP"].sum()))
+        c3.metric("Total WIP (W)", overall_total_wip)
 
-        st.subheader("📈 Cumulative Performance Trends")
-        # CHANGED: Graph now shows Cumulative values
-        st.line_chart(results_df[["Cumulative Total WIP", "Cumulative FG"]])
+        st.subheader("📈 Performance Trends")
+        # Graph: Daily WIP load vs the growth of Finished Goods
+        st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
         # --- Logging ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
@@ -166,8 +169,8 @@ with tab1:
             "Days, Initial WIP & Dice Range": f"Days={num_days} | WIP={wip_init} | {dice_info}",
             "Total Finished Goods": int(total_fg),
             "Mean Throughput (T)": round(total_fg / num_days, 2),
-            "Total WIP (W)": int(results_df["Daily_Total_WIP"].sum()),
-            "Lead Time (L = W / T)": round(results_df["Daily_Total_WIP"].sum() / (total_fg/num_days), 2) if total_fg > 0 else 0,
+            "Total WIP (W)": overall_total_wip,
+            "Lead Time (L = W / T)": round(overall_total_wip / (total_fg/num_days), 2) if total_fg > 0 else 0,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
         })
@@ -184,7 +187,9 @@ with tab1:
 with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
+        # Prepare Dataframes
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
+        
         s_df = pd.DataFrame(user_record["stations"])
         metrics = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
         rows = []
@@ -197,19 +202,29 @@ with tab2:
                 rows.append(row_data)
         df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
 
+        # Display Tables
         st.subheader("Table A: Global Summary History")
         st.table(df_table_a)
+        
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
         st.table(df_table_b)
 
+        # Excel Download Logic
         st.markdown("---")
         st.subheader("📥 Export Analytics")
+        
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_table_a.to_excel(writer, sheet_name='Global Summary')
             df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
+            
         excel_data = output.getvalue()
-        st.download_button(label="Download Analytics as Excel", data=excel_data, file_name=f"Simulation_Analytics_{current_user}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        st.download_button(
+            label="Download Analytics as Excel",
+            data=excel_data,
+            file_name=f"Simulation_Analytics_{current_user}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
     else:
         st.info("No recorded history found for this User ID.")
