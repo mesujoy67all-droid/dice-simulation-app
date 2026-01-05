@@ -75,8 +75,8 @@ if st.sidebar.button("🗑️ Clear Whole History"):
 
 st.sidebar.markdown("---")
 st.sidebar.header("Simulation Settings")
-num_members = st.sidebar.number_input("Workstations", min_value=2, value=7)
-num_days = st.sidebar.number_input("Days", min_value=1, value=25)
+num_members = st.sidebar.number_input("Workstations", min_value=2, value=8)
+num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
 
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 
@@ -208,3 +208,4 @@ with tab2:
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
     else:
         st.info("No recorded history found for this User ID.")
+
