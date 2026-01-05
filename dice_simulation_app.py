@@ -9,7 +9,7 @@ import io
 # -----------------------------------
 st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
-# Initialize session state
+# Initialize Session States
 if 'user_name' not in st.session_state:
     st.session_state.user_name = ""
 if 'scenario_history' not in st.session_state:
@@ -23,17 +23,11 @@ if not st.session_state.user_name:
         if name_input:
             st.session_state.user_name = name_input
             st.rerun()
-        else:
-            st.warning("Please enter a name.")
     st.stop()
 
 # -----------------------------------
-# Main App UI
+# Sidebar: Settings (Always Visible)
 # -----------------------------------
-st.title("🎲 Dice-Based Production Simulation Platform")
-st.markdown(f"**Operator:** {st.session_state.user_name} | **Tracking:** active")
-
-# Sidebar Settings
 st.sidebar.header("Simulation Settings")
 num_members = st.sidebar.number_input("Number of Workstations", min_value=2, value=7, step=1)
 num_days = st.sidebar.number_input("Number of Days", min_value=1, value=20, step=1)
@@ -60,120 +54,111 @@ def entropy(values):
     return -np.sum(p * np.log2(p))
 
 # -----------------------------------
-# Run Simulation
+# Navigation Tabs
 # -----------------------------------
-if st.sidebar.button("▶ Run Simulation"):
-    # Generate Dice Capacity
-    dice_data = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
-    df_dice = pd.DataFrame(dice_data)
-    df_dice.index += 1
+tab1, tab2 = st.tabs(["🚀 Active Simulation", "📊 Global System Diagnostics"])
 
-    # Logic & Recording
-    wip_buffers = initial_wip.copy()
-    history = []
-    total_finished_goods = 0
-    station_output = defaultdict(list)
-    station_wip_history = defaultdict(list)
+with tab1:
+    st.title("🎲 Active Simulation")
+    st.markdown(f"**Operator:** {st.session_state.user_name}")
 
-    for day in df_dice.index:
-        day_rolls = df_dice.loc[day]
-        daily_fg = 0
+    if st.sidebar.button("▶ Run Simulation & Record"):
+        # Generate Dice Capacity
+        dice_data = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
+        df_dice = pd.DataFrame(dice_data)
+        df_dice.index += 1
 
-        for i, m in enumerate(members):
-            roll = day_rolls[m]
-            if i == 0:
-                nxt = f"WIP_{members[i]}{members[i+1]}"
-                wip_buffers[nxt] += roll
-                station_output[m].append(roll)
-            elif i == len(members) - 1:
-                prv = f"WIP_{members[i-1]}{members[i]}"
-                move = min(roll, wip_buffers[prv])
-                wip_buffers[prv] -= move
-                daily_fg = move
-                total_finished_goods += move
-                station_output[m].append(move)
-            else:
-                prv = f"WIP_{members[i-1]}{members[i]}"
-                nxt = f"WIP_{members[i]}{members[i+1]}"
-                move = min(roll, wip_buffers[prv])
-                wip_buffers[prv] -= move
-                wip_buffers[nxt] += move
-                station_output[m].append(move)
+        # Logic & Recording
+        wip_buffers = initial_wip.copy()
+        history = []
+        total_finished_goods = 0
+        station_output = defaultdict(list)
+        station_wip_history = defaultdict(list)
 
-        for key, val in wip_buffers.items():
-            receiving_station = key.split("_")[1][1]
-            station_wip_history[receiving_station].append(val)
+        for day in df_dice.index:
+            day_rolls = df_dice.loc[day]
+            for i, m in enumerate(members):
+                roll = day_rolls[m]
+                if i == 0:
+                    nxt = f"WIP_{members[i]}{members[i+1]}"
+                    wip_buffers[nxt] += roll
+                    station_output[m].append(roll)
+                elif i == len(members) - 1:
+                    prv = f"WIP_{members[i-1]}{members[i]}"
+                    move = min(roll, wip_buffers[prv])
+                    wip_buffers[prv] -= move
+                    total_finished_goods += move
+                    station_output[m].append(move)
+                else:
+                    prv = f"WIP_{members[i-1]}{members[i]}"
+                    nxt = f"WIP_{members[i]}{members[i+1]}"
+                    move = min(roll, wip_buffers[prv])
+                    wip_buffers[prv] -= move
+                    wip_buffers[nxt] += move
+                    station_output[m].append(move)
 
-        rec = {"Day": day, **wip_buffers.copy(), "Daily_Total_WIP": sum(wip_buffers.values()), "Daily_FG": daily_fg}
-        history.append(rec)
+            for key, val in wip_buffers.items():
+                receiving_station = key.split("_")[1][1]
+                station_wip_history[receiving_station].append(val)
 
-    results_df = pd.DataFrame(history).set_index("Day")
-    
-    # Calculate Diagnostics for BN detection
-    table_b_rows = []
-    station_entropies = []
-    for key in wip_keys:
-        pair = key.split("_")[1] 
-        recv = pair[1]
-        h_i = entropy(station_output[recv])
-        station_entropies.append(h_i)
-        avg_w = np.mean(station_wip_history[recv]) if station_wip_history[recv] else 0
-        table_b_rows.append({"Pair": pair, "recv": recv, "avg_w": avg_w, "h_i": h_i})
+            rec = {"Day": day, **wip_buffers.copy(), "Daily_Total_WIP": sum(wip_buffers.values())}
+            history.append(rec)
 
-    # Detect Bottleneck (Station with highest Avg WIP)
-    bn_station = "N/A"
-    if table_b_rows:
-        bn_station = max(table_b_rows, key=lambda x: x['avg_w'])['recv']
+        results_df = pd.DataFrame(history).set_index("Day")
+        
+        # Calculate Metrics for History
+        t_put = total_finished_goods / num_days
+        avg_wip = results_df["Daily_Total_WIP"].mean()
+        station_entropies = [entropy(station_output[m]) for m in members]
+        h_bar = np.mean(station_entropies)
+        sigma_h = np.std(station_entropies)
 
-    # 3. RECORD TO SCENARIO HISTORY (Table A Format)
-    scenario_label = "Base-4" if len(st.session_state.scenario_history) == 0 else f"Scenario #{len(st.session_state.scenario_history)}"
-    t_put = total_finished_goods / num_days
-    avg_total_wip = results_df["Daily_Total_WIP"].mean()
-    
-    # Format the Initial WIP String
-    avg_init_wip = sum(initial_wip.values()) / len(members)
-    init_wip_display = f"WIP={int(avg_init_wip)}, Range {dice_configs['A'][0]}-{dice_configs['A'][1]}, BN={bn_station}"
+        # Build Scenario Label
+        scen_count = len(st.session_state.scenario_history)
+        scen_label = "Base-4" if scen_count == 0 else f"Scenario #{scen_count}"
+        
+        wip_val = list(initial_wip.values())[0] if initial_wip else 0
+        dice_sum = f"Range {dice_configs['A'][0]}-{dice_configs['A'][1]}"
+        
+        # Save to session state
+        st.session_state.scenario_history.append({
+            "Scenarios": scen_label,
+            "Initial WIP": f"WIP={wip_val}, {dice_sum}",
+            "Mean Throughput (T)": round(t_put, 2),
+            "Total WIP (W)": round(avg_wip, 2),
+            "Lead Time (L = W / T)": round(avg_wip/t_put, 2) if t_put > 0 else 0,
+            "Avg Entropy Ḣ": round(h_bar, 3),
+            "Entropy Spread σH": round(sigma_h, 3)
+        })
 
-    st.session_state.scenario_history.append({
-        "Scenarios": scenario_label,
-        "Initial WIP": init_wip_display,
-        "Mean Throughput (T)": round(t_put, 3),
-        "Total WIP (W)": round(avg_total_wip, 2),
-        "Lead Time (L = W / T)": round(avg_total_wip / t_put, 3) if t_put > 0 else 0,
-        "Avg Entropy Ĥ": round(np.mean(station_entropies), 3) if station_entropies else 0,
-        "Entropy Spread σH": round(np.std(station_entropies), 3) if station_entropies else 0
-    })
+        st.subheader("🎲 Daily Dice Rolls")
+        st.dataframe(df_dice, use_container_width=True)
+        st.subheader("📊 Simulation Logs")
+        st.dataframe(results_df, use_container_width=True)
+        st.success(f"Scenario Recorded as {scen_label} in Tab 2!")
 
-    # Current Station Diagnostics
-    st.subheader("📊 Station-Level Flow Diagnostics")
-    diag_df = pd.DataFrame([
-        {"Station Pair": r["Pair"], "Avg WIP": round(r["avg_w"], 2), "Entropy Hi": round(r["h_i"], 3)} 
-        for r in table_b_rows
-    ])
-    st.dataframe(diag_df, use_container_width=True)
+with tab2:
+    st.subheader("📊 Table A: Global System Diagnostics")
+    if st.session_state.scenario_history:
+        history_df = pd.DataFrame(st.session_state.scenario_history)
+        
+        # Display the formatted table
+        st.table(history_df.set_index("Scenarios"))
 
-# -----------------------------------
-# Table A: Global System Diagnostics (Scenario Tracker)
-# -----------------------------------
-if st.session_state.scenario_history:
-    st.markdown("---")
-    st.subheader("📊 Table A: Global System Diagnostics (Scenario Comparison)")
-    
-    history_df = pd.DataFrame(st.session_state.scenario_history)
-    st.table(history_df)
+        # Download Button
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            history_df.to_excel(writer, sheet_name='Diagnostics', index=False)
+        
+        st.download_button(
+            label="📥 Download Global Diagnostics",
+            data=output.getvalue(),
+            file_name=f"global_diagnostics_{st.session_state.user_name}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        st.info("No scenarios recorded yet. Go to 'Active Simulation' and click Run.")
 
-    # Excel Download
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        history_df.to_excel(writer, sheet_name='Global_Diagnostics', index=False)
-    
-    st.download_button(
-        label="📥 Download Scenario Report (.xlsx)",
-        data=output.getvalue(),
-        file_name=f"production_report_{st.session_state.user_name}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-if st.button("Reset All Scenarios"):
+if st.button("Reset All Data"):
     st.session_state.scenario_history = []
     st.rerun()
