@@ -9,9 +9,11 @@ import io
 # -----------------------------------
 st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
-# Initialize session state for the user name
+# Initialize session state for the user name and Scenario History
 if 'user_name' not in st.session_state:
     st.session_state.user_name = ""
+if 'scenario_history' not in st.session_state:
+    st.session_state.scenario_history = []
 
 # 1. Login Screen
 if not st.session_state.user_name:
@@ -29,7 +31,7 @@ if not st.session_state.user_name:
 # Main App UI
 # -----------------------------------
 st.title("🎲 Dice-Based Production Simulation Platform")
-st.markdown(f"**Current Operator:** {st.session_state.user_name} | **Status:** Recording Enabled")
+st.markdown(f"**Current Operator:** {st.session_state.user_name} | **Status:** Recording Scenarios")
 
 # Sidebar Settings
 st.sidebar.header("Simulation Settings")
@@ -60,14 +62,11 @@ def entropy(values):
 # -----------------------------------
 # Run Simulation
 # -----------------------------------
-if st.sidebar.button("▶ Run Simulation & Record"):
+if st.sidebar.button("▶ Run Simulation & Save Scenario"):
     # Generate Dice Capacity
     dice_data = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
     df_dice = pd.DataFrame(dice_data)
     df_dice.index += 1
-
-    st.subheader("🎲 Daily Capacity (Dice Rolls)")
-    st.dataframe(df_dice, use_container_width=True)
 
     # Logic & Recording
     wip_buffers = initial_wip.copy()
@@ -109,37 +108,58 @@ if st.sidebar.button("▶ Run Simulation & Record"):
         history.append(rec)
 
     results_df = pd.DataFrame(history).set_index("Day")
-    st.subheader("📊 Full Simulation Log")
+    
+    # Calculate Diagnostics for this run
+    t_put = total_finished_goods / num_days
+    avg_total_wip = results_df["Daily_Total_WIP"].mean()
+    l_time = avg_total_wip / t_put if t_put > 0 else 0
+    
+    # RECORD SCENARIO TO HISTORY
+    scenario_idx = len(st.session_state.scenario_history)
+    scenario_name = "Base-4" if scenario_idx == 0 else f"Scenario #{scenario_idx}"
+    
+    # Format settings summary for the table
+    dice_ranges = ", ".join([f"{m}({dice_configs[m][0]}-{dice_configs[m][1]})" for m in members])
+    wip_settings = ", ".join([f"{k}={v}" for k, v in initial_wip.items()])
+    
+    scenario_record = {
+        "Scenarios": scenario_name,
+        "Initial WIP & Range": f"WIP:[{wip_settings}], Range:[{dice_ranges}]",
+        "Mean Throughput (T)": round(t_put, 3),
+        "Total WIP (W)": round(avg_total_wip, 2),
+        "Lead Time (L = W / T)": round(l_time, 3),
+        "Avg Total Output": total_finished_goods
+    }
+    st.session_state.scenario_history.append(scenario_record)
+
+    # UI Display for current simulation
+    st.success(f"Successfully recorded {scenario_name}!")
+    st.subheader(f"📊 {scenario_name} Details")
     st.dataframe(results_df, use_container_width=True)
 
-    # Table B: Diagnostics (AB, BC, CD format)
-    table_b_rows = []
-    for key in wip_keys:
-        pair = key.split("_")[1] 
-        recv = pair[1]
-        outputs, wips = station_output[recv], station_wip_history[recv]
-        avg_w = np.mean(wips) if wips else 0
-        h_i = entropy(outputs)
-        
-        interp = "High variability" if h_i > 2 else "Bottleneck" if avg_w > 8 else "Stable"
-        table_b_rows.append({"Station Pair": pair, "Total Output": sum(outputs), "Avg WIP": round(avg_w, 2), "Entropy Hᵢ": round(h_i, 3), "Interpretation": interp})
+# -----------------------------------
+# MASTER SUMMARY TABLE (Bottom of Page)
+# -----------------------------------
+if st.session_state.scenario_history:
+    st.markdown("---")
+    st.subheader("📋 Table A: Global System Diagnostics (Scenario Comparison)")
+    
+    # Convert history list to DataFrame
+    comparison_df = pd.DataFrame(st.session_state.scenario_history)
+    st.table(comparison_df)
 
-    st.subheader("📊 Table B: Station-Level Flow Diagnostics")
-    st.dataframe(pd.DataFrame(table_b_rows), use_container_width=True)
-
-    # Excel Download Logic
+    # Excel Download
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        results_df.to_excel(writer, sheet_name='History')
-        pd.DataFrame(table_b_rows).to_excel(writer, sheet_name='Diagnostics')
+        comparison_df.to_excel(writer, sheet_name='Global_Diagnostics', index=False)
     
     st.download_button(
-        label="📥 Download Excel Results",
+        label="📥 Download Global Scenario Table (.xlsx)",
         data=output.getvalue(),
-        file_name=f"dice_sim_{st.session_state.user_name}.xlsx",
+        file_name=f"production_summary_{st.session_state.user_name}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-if st.button("Log Out"):
-    st.session_state.user_name = ""
+if st.button("Reset All Scenarios"):
+    st.session_state.scenario_history = []
     st.rerun()
