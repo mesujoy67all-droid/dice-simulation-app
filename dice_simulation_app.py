@@ -129,40 +129,43 @@ with tab1:
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
 
-            history.append({"Day": day, **wip_buffers.copy(), "Daily_Total_WIP": sum(wip_buffers.values()), "Daily_FG": daily_fg_out})
+            history.append({"Day": day, **wip_buffers.copy(), "Day-wise Total WIP": sum(wip_buffers.values()), "Daily_FG": daily_fg_out})
 
         results_df = pd.DataFrame(history).set_index("Day")
+        
+        # Merge the Total WIP back into the Dice table for the requested view
+        df_dice_with_wip = df_dice.copy()
+        df_dice_with_wip["Day-wise Total WIP"] = results_df["Day-wise Total WIP"]
 
         # --- Display Outputs ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
-        st.dataframe(df_dice, use_container_width=True)
+        st.dataframe(df_dice_with_wip, use_container_width=True)
 
         st.subheader("📦 Work-In-Progress (WIP) History")
-        st.dataframe(results_df.drop(columns=["Daily_FG"]), use_container_width=True)
+        st.dataframe(results_df.drop(columns=["Daily_FG", "Day-wise Total WIP"]), use_container_width=True)
 
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Finished Goods", int(total_fg))
         c2.metric("Throughput (T)", round(total_fg / num_days, 2))
-        c3.metric("Avg Total WIP (W)", round(results_df["Daily_Total_WIP"].mean(), 2))
+        c3.metric("Avg Total WIP (W)", round(results_df["Day-wise Total WIP"].mean(), 2))
 
         st.subheader("📈 Performance Trends")
-        st.line_chart(results_df[["Daily_Total_WIP", "Daily_FG"]])
+        st.line_chart(results_df[["Day-wise Total WIP", "Daily_FG"]])
 
         # --- Logging ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         wip_init = list(initial_wip.values())[0] if initial_wip else 0
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         
-        # ADDING DAYS TO THE LOG COLUMN
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": f"Days={num_days} | WIP={wip_init} | {dice_info}",
             "Total Finished Goods": int(total_fg),
             "Mean Throughput (T)": round(total_fg / num_days, 2),
-            "Total WIP (W)": round(results_df["Daily_Total_WIP"].mean(), 2),
-            "Lead Time (L = W / T)": round(results_df["Daily_Total_WIP"].mean() / (total_fg/num_days), 2) if total_fg > 0 else 0,
+            "Total WIP (W)": round(results_df["Day-wise Total WIP"].mean(), 2),
+            "Lead Time (L = W / T)": round(results_df["Day-wise Total WIP"].mean() / (total_fg/num_days), 2) if total_fg > 0 else 0,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
         })
@@ -179,7 +182,6 @@ with tab1:
 with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
-        # Prepare Dataframes
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
         
         s_df = pd.DataFrame(user_record["stations"])
@@ -194,7 +196,6 @@ with tab2:
                 rows.append(row_data)
         df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
 
-        # Display Tables
         st.subheader("Table A: Global Summary History")
         st.table(df_table_a)
         
@@ -202,7 +203,6 @@ with tab2:
         st.subheader("Table B: Station-Level Flow Diagnostics")
         st.table(df_table_b)
 
-        # Excel Download Logic
         st.markdown("---")
         st.subheader("📥 Export Analytics")
         
