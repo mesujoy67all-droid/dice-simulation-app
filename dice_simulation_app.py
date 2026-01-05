@@ -26,13 +26,14 @@ def auth_gateway():
         
         if auth_mode == "Signup":
             if st.button("Create Account"):
-                if user_id in st.session_state.user_db:
-                    st.error("User ID already exists. Please login.")
-                elif user_id and pwd:
-                    st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": []}
-                    st.success("Account created successfully! Please switch to Login mode.")
-                else:
+                if not user_id or not pwd:
                     st.warning("Please provide both User ID and Password.")
+                elif user_id in st.session_state.user_db:
+                    # STRICT RULE: ONE SIGNUP ONLY PER USERID
+                    st.error(f"User ID '{user_id}' is already registered. Please switch to 'Login' mode.")
+                else:
+                    st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": []}
+                    st.success("Account created successfully! Now, please switch to 'Login' mode to enter.")
                     
         elif auth_mode == "Login":
             if st.button("Sign In"):
@@ -43,7 +44,7 @@ def auth_gateway():
                     else:
                         st.error("Invalid password.")
                 else:
-                    st.error("User ID not found. Please Signup.")
+                    st.error("User ID not found. Please Signup first.")
 
 # Check Authentication
 if st.session_state.authenticated_user is None:
@@ -64,18 +65,18 @@ if st.sidebar.button("🚪 Logout"):
 
 st.sidebar.markdown("---")
 
-# CLEAR HISTORY (Requested Feature)
+# CLEAR HISTORY
 st.sidebar.subheader("Data Management")
 if st.sidebar.button("🗑️ Clear Whole History"):
     user_record["history"] = []
     user_record["stations"] = []
-    st.sidebar.success("All history has been cleared.")
+    st.sidebar.success("All history for this user has been wiped.")
     st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.header("Simulation Settings")
-num_members = st.sidebar.number_input("Workstations", min_value=2, value=8)
-num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
+num_members = st.sidebar.number_input("Workstations", min_value=2, value=7)
+num_days = st.sidebar.number_input("Days", min_value=1, value=25)
 
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 
@@ -143,7 +144,7 @@ with tab1:
 
         results_df = pd.DataFrame(history).set_index("Day")
 
-        # --- Display Outputs ---
+        # --- Display Outputs (Requested Order) ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
@@ -199,7 +200,6 @@ with tab2:
         rows = []
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics):
-                # Row merging logic
                 row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
                 for s_label in s_df['Station'].unique():
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
@@ -207,4 +207,4 @@ with tab2:
                 rows.append(row_data)
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
     else:
-        st.info("No recorded history found for this User ID. Complete a simulation to see diagnostics.")
+        st.info("No recorded history found for this User ID.")
