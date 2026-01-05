@@ -137,9 +137,9 @@ with tab1:
 
         results_df = pd.DataFrame(history).set_index("Day")
         
-        # Calculate Cumulative Finished Goods for the Graph
+        # Calculate Cumulative Finished Goods and Total Sum of WIP
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
-        overall_total_wip = int(results_df["Daily_Total_WIP"].sum())
+        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
 
         # --- Display Outputs ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
@@ -153,10 +153,10 @@ with tab1:
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Finished Goods", int(total_fg))
         c2.metric("Throughput (T)", round(total_fg / num_days, 2))
-        c3.metric("Total WIP (W)", overall_total_wip)
+        c3.metric("Total WIP (Sum)", sum_total_wip)
 
         st.subheader("📈 Performance Trends")
-        # Graph: Daily WIP load vs the growth of Finished Goods
+        # Graph: Daily WIP load vs Cumulative growth of Finished Goods
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
         # --- Logging ---
@@ -169,8 +169,8 @@ with tab1:
             "Days, Initial WIP & Dice Range": f"Days={num_days} | WIP={wip_init} | {dice_info}",
             "Total Finished Goods": int(total_fg),
             "Mean Throughput (T)": round(total_fg / num_days, 2),
-            "Total WIP (W)": overall_total_wip,
-            "Lead Time (L = W / T)": round(overall_total_wip / (total_fg/num_days), 2) if total_fg > 0 else 0,
+            "Total WIP (W)": sum_total_wip,
+            "Lead Time (L = W / T)": round(sum_total_wip / (total_fg/num_days), 2) if total_fg > 0 else 0,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
         })
@@ -187,7 +187,6 @@ with tab1:
 with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
-        # Prepare Dataframes
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
         
         s_df = pd.DataFrame(user_record["stations"])
@@ -202,7 +201,6 @@ with tab2:
                 rows.append(row_data)
         df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
 
-        # Display Tables
         st.subheader("Table A: Global Summary History")
         st.table(df_table_a)
         
@@ -210,7 +208,6 @@ with tab2:
         st.subheader("Table B: Station-Level Flow Diagnostics")
         st.table(df_table_b)
 
-        # Excel Download Logic
         st.markdown("---")
         st.subheader("📥 Export Analytics")
         
