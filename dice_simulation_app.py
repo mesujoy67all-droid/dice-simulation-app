@@ -8,8 +8,6 @@ import io
 st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
 # --- User Database Simulation ---
-# NOTE: For Web permanence, use the Supabase or GSheets method discussed earlier.
-# This keeps the session logic for now to fix the current crash.
 if 'user_db' not in st.session_state:
     st.session_state.user_db = {} 
 
@@ -75,6 +73,8 @@ num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members}
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
+
+# UPDATED: Sidebar capturing all individual WIP inputs
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
 def calculate_entropy(values):
@@ -139,11 +139,10 @@ with tab1:
 
         results_df = pd.DataFrame(history).set_index("Day")
         
-        # Calculate Cumulative Finished Goods and Total Sum of WIP
+        # Calculations for UI
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
 
-        # --- Display Outputs ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
@@ -158,17 +157,18 @@ with tab1:
         c3.metric("Total WIP (Sum)", sum_total_wip)
 
         st.subheader("📈 Performance Trends")
-        # Graph: Daily WIP vs Cumulative growth of Finished Goods
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
-        # --- Logging ---
+        # --- Logging Logic ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
-        wip_init = list(initial_wip.values())[0] if initial_wip else 0
+        
+        # UPDATED: Capture all individual WIP station values for the log
+        wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in initial_wip.items()])
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         
         user_record["history"].append({
             "Scenarios": scen_label,
-            "Days, Initial WIP & Dice Range": f"Days={num_days} | WIP={wip_init} | {dice_info}",
+            "Days, Initial WIP & Dice Range": f"Days={num_days} | {wip_summary} | {dice_info}",
             "Total Finished Goods": int(total_fg),
             "Mean Throughput (T)": round(total_fg / num_days, 2),
             "Total WIP (W)": sum_total_wip,
@@ -178,10 +178,10 @@ with tab1:
         })
 
         for m in members:
-            # Logic to remove Station A: we check if this member is the first station
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
-            if pair == "A" or pair == members[0]:
-                continue # Skip adding Station A to the diagnostics log
+            # Remove Station A from diagnostic table logic
+            if pair == "A":
+                continue
                 
             h_val = calculate_entropy(st_output[m])
             user_record["stations"].append({
@@ -198,12 +198,9 @@ with tab2:
         s_df = pd.DataFrame(user_record["stations"])
         metrics = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
         rows = []
-        
-        # Build Table B without Station A
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics):
                 row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
-                # Station list will naturally exclude 'Station A' because it wasn't logged above
                 for s_label in s_df['Station'].unique():
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
                     row_data[s_label] = subset[metric].values[0] if not subset.empty else ""
@@ -220,18 +217,11 @@ with tab2:
 
         st.markdown("---")
         st.subheader("📥 Export Analytics")
-        
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_table_a.to_excel(writer, sheet_name='Global Summary')
             df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
-            
         excel_data = output.getvalue()
-        st.download_button(
-            label="Download Analytics as Excel",
-            data=excel_data,
-            file_name=f"Simulation_Analytics_{current_user}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        st.download_button(label="Download Analytics as Excel", data=excel_data, file_name=f"Simulation_Analytics_{current_user}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     else:
         st.info("No recorded history found for this User ID.")
