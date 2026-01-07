@@ -83,7 +83,7 @@ def calculate_entropy(values):
     return -np.sum(p * np.log2(p))
 
 # --- Application Tabs ---
-tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology & Logic"])
+tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology"])
 
 with tab1:
     st.title("🚀 Live Operations Console")
@@ -126,7 +126,12 @@ with tab1:
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
 
-            history.append({"Day": day, **wip_buffers.copy(), "Daily_Total_WIP": sum(wip_buffers.values()), "Day Wise Total FG": daily_fg_out})
+            history.append({
+                "Day": day, 
+                **wip_buffers.copy(), 
+                "Daily_Total_WIP": sum(wip_buffers.values()), 
+                "Day Wise Total FG": daily_fg_out
+            })
 
         results_df = pd.DataFrame(history).set_index("Day")
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
@@ -135,9 +140,6 @@ with tab1:
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
-        st.subheader("📦 Work-In-Progress (WIP) History")
-        st.dataframe(results_df, use_container_width=True)
-
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
@@ -145,12 +147,13 @@ with tab1:
         c2.metric("Throughput (T)", round(total_fg / num_days, 2))
         c3.metric("Total WIP (Sum)", sum_total_wip)
 
-        st.subheader("📈 Performance Trends")
-        st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
-
+        # Logging Logic
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in initial_wip.items()])
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
+        
+        # Calculate Entropies for Logging
+        station_entropies = [calculate_entropy(st_output[m]) for m in members]
         
         user_record["history"].append({
             "Scenarios": scen_label,
@@ -159,8 +162,8 @@ with tab1:
             "Mean Throughput (T)": round(total_fg / num_days, 2),
             "Total WIP (W)": sum_total_wip,
             "Lead Time (L = W / T)": round(sum_total_wip / (total_fg/num_days), 2) if total_fg > 0 else 0,
-            "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
-            "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
+            "Avg Entropy Ḣ": round(np.mean(station_entropies), 3),
+            "Entropy Spread σH": round(np.std(station_entropies), 3)
         })
 
         for m in members:
@@ -190,45 +193,66 @@ with tab2:
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
                     row_data[s_label] = subset[metric].values[0] if not subset.empty else ""
                 rows.append(row_data)
-        
         df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics (Buffers Only)")
         st.table(df_table_b)
     else:
-        st.info("No recorded history found for this User ID.")
+        st.info("No recorded history found.")
 
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
-    
-    st.header("🔄 Process Architecture")
-    st.markdown("""
-    The system follows a linear chain where each station's output is restricted by its own dice capacity and the inventory available in its predecessor's buffer.
-    """)
-    
+    st.markdown("This page pulls back the curtain on the simulation engine and the mathematical rigor behind the metrics.")
 
-    st.header("📊 Global Summary Logic (Table A)")
-    st.markdown("This table summarizes the system's performance across the entire simulation duration.")
-    
+    # --- Section 1: Flow Logic ---
+    st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
+    st.markdown("""
+    The simulation operates as a **Sequential Dependency** chain. 
+    A station's ability to produce is limited not just by its own capacity (dice), but by the 
+    availability of material from the station before it.
+    """)
+    st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
+
+    st.markdown("---")
+
+    # --- Section 2: Global Summary Logic ---
+    st.header("📊 Table A: Global Summary Logic")
+    st.markdown("These metrics evaluate the entire system's health across all workstations.")
+
     col1, col2 = st.columns(2)
     with col1:
         st.write("### Throughput ($T$)")
-        st.latex(r"T = \frac{\sum_{d=1}^{n} \text{Daily FG}}{n}")
-        st.write("### Lead Time ($L$)")
-        st.latex(r"L = \frac{\sum \text{Daily Total WIP}}{T}")
-    
-    with col2:
-        st.write("### Average Entropy ($\bar{H}$)")
-        st.markdown("The system-wide average of uncertainty. High $\bar{H}$ suggests general process instability.")
+        st.latex(r"T = \frac{\sum_{day=1}^{n} \text{Daily FG}}{n}")
+        
+        st.write("### Average System Entropy ($\bar{H}$)")
+        st.markdown("The mean level of uncertainty across the entire plant.")
         st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
+        st.caption("Where M is the number of workstations.")
+        
+    with col2:
+        st.write("### Lead Time ($L$)")
+        st.latex(r"L = \frac{\text{Sum of Daily Total WIP}}{T}")
         
         st.write("### Entropy Spread ($\sigma H$)")
-        st.markdown("Measures the disparity in stability between stations. A high spread indicates a 'bottleneck' effect where some stations are stable while others are chaotic.")
+        st.markdown("Measures the 'imbalance' or variance in stability between stations.")
         st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
+        st.caption("High spread indicates a system where some stations are stable while others are chaotic.")
 
-    st.header("🔬 Entropy & Information Theory")
+    st.markdown("---")
+
+    # --- Section 3: Entropy Calculation ---
+    st.header("🔬 Station-Level Entropy ($H_i$)")
     st.markdown("""
-    We use **Shannon Entropy** to quantify how 'random' or 'unpredictable' a station's daily movement is.
+    Entropy quantifies the 'chaos' in a station's daily output. If a station consistently outputs 3 units, its entropy is 0. If it randomly outputs anywhere from 1 to 6, its entropy is high.
     """)
-    st.latex(r"H = -\sum_{x} P(x) \log_2 P(x)")
-    st.info("**Interpretation:** If a station always produces 4 units, its entropy is 0 (perfect stability). If it produces values from 1-6 with equal frequency, its entropy is high (~2.58).")
+    
+    
+
+    st.latex(r"H_i = -\sum_{x \in X} P(x) \log_2 P(x)")
+    
+    st.markdown("""
+    * **Low Entropy (< 2.4):** **Stable.** The station's output is predictable, allowing for smooth downstream flow.
+    * **High Entropy (≥ 2.4):** **Variable.** The station is 'jittery,' creating 'waves' of WIP that clog the system.
+    """)
+
+    st.info("**Interpretation Tip:** To reduce Lead Time ($L$), focus on reducing the Entropy Spread ($\sigma H$) by standardizing the dice ranges of the most 'Variable' stations.")
