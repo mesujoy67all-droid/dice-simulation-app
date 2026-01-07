@@ -74,7 +74,7 @@ members = [chr(64 + i) for i in range(1, num_members + 1)]
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members}
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
-# UPDATED: Sidebar capturing all individual WIP inputs
+# Sidebar capturing all individual WIP inputs
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
 def calculate_entropy(values):
@@ -83,8 +83,8 @@ def calculate_entropy(values):
     p = counts / counts.sum()
     return -np.sum(p * np.log2(p))
 
-# --- Application Tabs ---
-tab1, tab2 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics"])
+# --- Application Tabs (UPDATED TO INCLUDE TAB 3) ---
+tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology"])
 
 with tab1:
     st.title("🚀 Live Operations Console")
@@ -162,7 +162,6 @@ with tab1:
         # --- Logging Logic ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         
-        # UPDATED: Capture all individual WIP station values for the log
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in initial_wip.items()])
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         
@@ -179,7 +178,6 @@ with tab1:
 
         for m in members:
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
-            # Remove Station A from diagnostic table logic
             if pair == "A":
                 continue
                 
@@ -225,7 +223,9 @@ with tab2:
         st.download_button(label="Download Analytics as Excel", data=excel_data, file_name=f"Simulation_Analytics_{current_user}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     else:
         st.info("No recorded history found for this User ID.")
-    with tab3:
+
+# --- Tab 3: Methodology (FIXED INDENTATION AND TAB REFERENCE) ---
+with tab3:
     st.title("📖 Simulation Methodology & Logic")
     st.markdown("""
     This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
@@ -239,8 +239,6 @@ with tab2:
     A station's ability to produce is limited not just by its own capacity (dice), but by the 
     availability of material from the station before it.
     """)
-
-    
 
     st.markdown("""
     **The Step-by-Step Logic:**
@@ -282,7 +280,8 @@ with tab2:
     st.markdown("""
     **How to read Table B:**
     * **Avg WIP:** The mean level of inventory sitting in the buffer *before* that station. High WIP here indicates this station is a **Bottleneck**.
-    * **Entropy ($H_i$):** * **Low Entropy (< 2.4):** Stable. The station's output is predictable.
+    * **Entropy ($H_i$):**
+        * **Low Entropy (< 2.4):** Stable. The station's output is predictable.
         * **High Entropy (≥ 2.4):** Variable. The station is 'jittery,' causing ripples of instability upstream and downstream.
     """)
 
