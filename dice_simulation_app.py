@@ -73,6 +73,8 @@ num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members}
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
+
+# UPDATED: Sidebar capturing all individual WIP inputs
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
 def calculate_entropy(values):
@@ -82,18 +84,19 @@ def calculate_entropy(values):
     return -np.sum(p * np.log2(p))
 
 # --- Application Tabs ---
-tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology & Logic"])
+tab1, tab2 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics"])
 
-# --- TAB 1: LIVE OPERATIONS ---
 with tab1:
     st.title("🚀 Live Operations Console")
     
     if st.sidebar.button("▶ Run & Save Simulation"):
+        # 1. Capacity Generation
         dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
         df_dice = pd.DataFrame(dice_rolls)
         df_dice.index = range(1, num_days + 1)
         df_dice.index.name = "Day"
 
+        # 2. Simulation Logic
         wip_buffers = initial_wip.copy()
         history = []
         total_fg = 0
@@ -127,9 +130,16 @@ with tab1:
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
 
-            history.append({"Day": day, **wip_buffers.copy(), "Daily_Total_WIP": sum(wip_buffers.values()), "Day Wise Total FG": daily_fg_out})
+            history.append({
+                "Day": day, 
+                **wip_buffers.copy(), 
+                "Daily_Total_WIP": sum(wip_buffers.values()), 
+                "Day Wise Total FG": daily_fg_out
+            })
 
         results_df = pd.DataFrame(history).set_index("Day")
+        
+        # Calculations for UI
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
 
@@ -146,56 +156,46 @@ with tab1:
         c2.metric("Throughput (T)", round(total_fg / num_days, 2))
         c3.metric("Total WIP (Sum)", sum_total_wip)
 
-        # Logging Logic
-        scen_label = f"Scenario #{scen_id}"
+        st.subheader("📈 Performance Trends")
+        st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
+
+        # --- Logging Logic ---
+        scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
+        
+        # UPDATED: Capture all individual WIP station values for the log
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in initial_wip.items()])
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
-        
-        throughput = total_fg / num_days
-        lead_time = sum_total_wip / throughput if throughput > 0 else 0
         
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": f"Days={num_days} | {wip_summary} | {dice_info}",
             "Total Finished Goods": int(total_fg),
-            "Mean Throughput (T)": round(throughput, 2),
+            "Mean Throughput (T)": round(total_fg / num_days, 2),
             "Total WIP (W)": sum_total_wip,
-            "Lead Time (L = W / T)": round(lead_time, 2),
+            "Lead Time (L = W / T)": round(sum_total_wip / (total_fg/num_days), 2) if total_fg > 0 else 0,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
-            "Efficiency Score": round(throughput / lead_time, 4) if lead_time > 0 else 0
+            "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
         })
 
         for m in members:
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
-            if pair == "A": continue
+            # Remove Station A from diagnostic table logic
+            if pair == "A":
+                continue
+                
             h_val = calculate_entropy(st_output[m])
             user_record["stations"].append({
                 "Scenario": scen_label, "Station": f"Station {pair}", "Dice Range": f"{dice_configs[m][0]}-{dice_configs[m][1]}",
                 "Tot Output": sum(st_output[m]), "Avg WIP": round(np.mean(st_wip_trend[pair]), 2) if pair in st_wip_trend else 0,
                 "Entropy Hi": round(h_val, 3), "Interpretation": "Variable" if h_val > 2.4 else "Stable"
             })
-        st.rerun()
 
-# --- TAB 2: PERFORMANCE ANALYTICS ---
 with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
-        # 1. Executive Leaderboard
-        st.subheader("🏆 Scenario Leaderboard")
-        summary_df = pd.DataFrame(user_record["history"])
-        ranked_df = summary_df.sort_values(by='Efficiency Score', ascending=False).reset_index(drop=True)
-        st.success(f"🥇 **Best Performing Setup:** {ranked_df.iloc[0]['Scenarios']} (Score: {ranked_df.iloc[0]['Efficiency Score']})")
-        st.dataframe(ranked_df[['Scenarios', 'Total Finished Goods', 'Lead Time (L = W / T)', 'Efficiency Score']], use_container_width=True)
-
-        # 2. Heatmap Table B
-        st.markdown("---")
-        st.subheader("🌡️ Station-Level Flow Heatmap")
-        s_df = pd.DataFrame(user_record["stations"])
+        df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
         
-        def color_variability(val):
-            if isinstance(val, (int, float)) and val > 2.4: return 'background-color: #ff4b4b; color: white'
-            return ''
-
+        s_df = pd.DataFrame(user_record["stations"])
         metrics = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
         rows = []
         for scen in s_df['Scenario'].unique():
@@ -207,43 +207,85 @@ with tab2:
                 rows.append(row_data)
         
         df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
-        st.table(df_table_b.style.applymap(color_variability, subset=pd.IndexSlice[pd.Slice(None), "Entropy Hi"], axis=0))
 
-# --- TAB 3: METHODOLOGY & BOTTLENECK ---
-with tab3:
+        st.subheader("Table A: Global Summary History")
+        st.table(df_table_a)
+        
+        st.markdown("---")
+        st.subheader("Table B: Station-Level Flow Diagnostics (Buffers Only)")
+        st.table(df_table_b)
+
+        st.markdown("---")
+        st.subheader("📥 Export Analytics")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_table_a.to_excel(writer, sheet_name='Global Summary')
+            df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
+        excel_data = output.getvalue()
+        st.download_button(label="Download Analytics as Excel", data=excel_data, file_name=f"Simulation_Analytics_{current_user}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    else:
+        st.info("No recorded history found for this User ID.")
+    with tab3:
     st.title("📖 Simulation Methodology & Logic")
+    st.markdown("""
+    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
+    """)
+
+    # --- Section 1: Visual Process Flow ---
+    st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
     
-    st.header("🔄 The Logic of Flow")
-    st.markdown("This simulation models **Statistical Fluctuations** and **Dependent Events**.")
+    st.markdown("""
+    The simulation operates as a **Sequential Dependency** chain. 
+    A station's ability to produce is limited not just by its own capacity (dice), but by the 
+    availability of material from the station before it.
+    """)
+
     
+
+    st.markdown("""
+    **The Step-by-Step Logic:**
+    1.  **Station A (The Source):** Acts as the 'faucet.' It has an infinite supply. Its output for the day is strictly its **Dice Roll**.
+    2.  **The Buffer ($WIP_{AB}$):** This is a storage tank. Station A adds to it; Station B takes from it.
+    3.  **Station B (The Processor):** It looks at its **Dice Roll** (Potential) and the **Buffer** (Available). It can only move the **minimum** of those two values.
+    """)
+
     st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
 
-    st.header("📊 Key Formulas")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.latex(r"T = \frac{\sum FG}{Days}")
-        st.latex(r"L = \frac{\text{Total WIP}}{T}")
-    with c2:
-        st.latex(r"H = -\sum P(x) \log_2 P(x)")
-        st.write("**Entropy** identifies where variability is killing your flow.")
+    st.markdown("---")
+
+    # --- Section 2: Table A Calculations ---
+    st.header("📊 Table A: Global Summary Metrics")
+    st.markdown("These formulas aggregate the daily data into strategic performance indicators.")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("### Throughput ($T$)")
+        st.markdown("The average rate at which the system generates finished goods.")
+        st.latex(r"T = \frac{\sum_{day=1}^{n} \text{Daily FG}}{n}")
+        
+    with col2:
+        st.write("### Lead Time ($L$)")
+        st.markdown("The average time a unit takes to travel through the entire plant.")
+        st.latex(r"L = \frac{\text{Sum of Daily Total WIP}}{T}")
+        st.caption("Derived from Little's Law.")
 
     st.markdown("---")
-    st.header("🛠️ Bottleneck Diagnostic Tool")
-    if user_record["stations"]:
-        s_df = pd.DataFrame(user_record["stations"])
-        latest_scen = s_df['Scenario'].iloc[-1]
-        current_scen_df = s_df[s_df['Scenario'] == latest_scen]
-        
-        bn_row = current_scen_df.loc[current_scen_df['Avg WIP'].idxmax()]
-        st.error(f"🚨 **Detected Bottleneck:** {bn_row['Station']} (Avg WIP: {bn_row['Avg WIP']})")
-        
 
-        st.subheader("🧪 Buffer Stock Recommender")
-        target_st = st.selectbox("Select Station to Analyze:", current_scen_df['Station'].unique())
-        st_val = current_scen_df[current_scen_df['Station'] == target_st].iloc[0]
-        
-        d_min, d_max = map(int, st_val['Dice Range'].split('-'))
-        safety_stock = round((d_max - d_min) * st_val['Entropy Hi'], 1)
-        st.info(f"To protect **{target_st}** from upstream starvation, set Initial WIP to **{safety_stock}** units.")
-    else:
-        st.info("Run a simulation to unlock diagnostic tools.")
+    # --- Section 3: Table B Calculations ---
+    st.header("🔬 Table B: Station-Level Flow Diagnostics")
+    st.markdown("""
+    This table measures **Entropy ($H$)**, which quantifies the uncertainty or 'chaos' in a station's output.
+    """)
+
+    st.latex(r"H = -\sum P(x) \log_2 P(x)")
+
+    st.markdown("""
+    **How to read Table B:**
+    * **Avg WIP:** The mean level of inventory sitting in the buffer *before* that station. High WIP here indicates this station is a **Bottleneck**.
+    * **Entropy ($H_i$):** * **Low Entropy (< 2.4):** Stable. The station's output is predictable.
+        * **High Entropy (≥ 2.4):** Variable. The station is 'jittery,' causing ripples of instability upstream and downstream.
+    """)
+
+    st.info("""
+    **Note on 'Interpretation':** The 'Variable' vs 'Stable' tag is a diagnostic to help you identify which station's dice range needs to be tightened (standardized) to improve flow.
+    """)
