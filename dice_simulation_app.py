@@ -89,11 +89,13 @@ with tab1:
     st.title("🚀 Live Operations Console")
     
     if st.sidebar.button("▶ Run & Save Simulation"):
+        # 1. Capacity Generation
         dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
         df_dice = pd.DataFrame(dice_rolls)
         df_dice.index = range(1, num_days + 1)
         df_dice.index.name = "Day"
 
+        # 2. Simulation Logic
         wip_buffers = initial_wip.copy()
         history = []
         total_fg = 0
@@ -154,7 +156,7 @@ with tab1:
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
-        # --- Logging Logic (Updated TR) ---
+        # --- Logging Logic ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in initial_wip.items()])
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
@@ -172,7 +174,8 @@ with tab1:
 
         for m in members:
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
-            if pair == "A": continue
+            if pair == "A":
+                continue
                 
             h_val = calculate_entropy(st_output[m])
             user_record["stations"].append({
@@ -185,6 +188,7 @@ with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
+        
         s_df = pd.DataFrame(user_record["stations"])
         metrics = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
         rows = []
@@ -198,7 +202,7 @@ with tab2:
         
         df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
 
-        st.subheader("Table A: Summary History") # Updated Name
+        st.subheader("Table A: Summary History")
         st.table(df_table_a)
         
         st.markdown("---")
@@ -216,47 +220,80 @@ with tab2:
     else:
         st.info("No recorded history found for this User ID.")
 
+# --- PAGE 3: METHODOLOGY ---
 with tab3:
-    st.title("📖 Methodology")
-    
+    st.title("📖 Simulation Methodology & Logic")
     st.markdown("""
-    This page explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
+    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
     """)
 
+    # --- Section 1: Visual Process Flow ---
     st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
-    st.markdown("""
-    The simulation operates as a **Sequential Dependency** chain. Station B looks at its **Dice Roll** (Potential) and the **Buffer** (Available). 
-    It can only move the **minimum** of those two values.
+    
+    st.markdown("### System Architecture")
+    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
+    
+    # Visualizing the chain for students
+    st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
+
+    
+
+    st.info("""
+    **The Student's Guide to Movement Logic:**
+    Imagine a relay race. Even if the second runner is the fastest in the world (high dice roll), they cannot run if the first runner hasn't handed them the baton (low buffer). 
+    
+    **The rule is always:** The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
     """)
+
     st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
 
     st.markdown("---")
 
-    st.header("📊 Table A: Summary History") # Updated Name
+    # --- Section 2: Table A Calculations ---
+    st.header("📊 Table A: Summary History")
     st.markdown("These formulas aggregate the daily data into strategic performance indicators.")
 
     col1, col2 = st.columns(2)
     with col1:
-        st.write("### Throughput Rate ($TR$)") # Updated Name
+        st.write("### Throughput Rate ($TR$)")
         st.markdown("The average rate at which the system generates finished goods.")
         st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily FG}}{n}")
 
         st.write("### Average System Entropy ($\bar{H}$)")
+        st.markdown("The mean level of uncertainty across the entire plant.")
         st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
+        st.caption("Where M is the number of workstations.")
         
     with col2:
         st.write("### Lead Time ($L$)")
         st.markdown("The average time a unit takes to travel through the entire plant.")
-        st.latex(r"L = \frac{\text{Sum of Daily Total WIP}}{TR}") # Updated TR
+        st.latex(r"L = \frac{\text{Sum of Daily Total WIP}}{TR}")
         st.caption("Derived from Little's Law.")
 
         st.write("### Entropy Spread ($\sigma H$)")
+        st.markdown("Measures the imbalance or variance in stability between stations.")
         st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
 
     st.markdown("---")
+
+    # --- Section 3: Table B Calculations ---
     st.header("🔬 Table B: Station-Level Flow Diagnostics")
-    st.latex(r"H = -\sum P(x) \log_2 P(x)")
     st.markdown("""
-    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**.
-    * **Entropy ($H_i$):** Quantifies uncertainty in output. High entropy (≥ 2.4) suggests instability.
+    This table measures **Entropy ($H$)**, which quantifies the uncertainty or 'chaos' in a station's output.
+    """)
+    
+    
+
+    st.latex(r"H = -\sum P(x) \log_2 P(x)")
+
+    st.markdown("""
+    **How to read Table B:**
+    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**—it's where work piles up because this station cannot keep up with the one before it.
+    * **Entropy ($H_i$):**
+        * **Stable (< 2.4):** Predictable output. The station is consistent.
+        * **Variable (≥ 2.4):** High 'jitter.' The station is chaotic, making it hard to predict flow.
+    """)
+
+    st.info("""
+    **Note on 'Interpretation':** The 'Variable' vs 'Stable' tag is a diagnostic to help you identify which station's dice range needs to be tightened (standardized) to improve flow.
     """)
