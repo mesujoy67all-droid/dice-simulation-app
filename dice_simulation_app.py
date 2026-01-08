@@ -74,7 +74,6 @@ members = [chr(64 + i) for i in range(1, num_members + 1)]
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members}
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
-# UPDATED: Sidebar capturing all individual WIP inputs
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
 def calculate_entropy(values):
@@ -84,7 +83,7 @@ def calculate_entropy(values):
     return -np.sum(p * np.log2(p))
 
 # --- Application Tabs ---
-tab1, tab2 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics"])
+tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology"])
 
 with tab1:
     st.title("🚀 Live Operations Console")
@@ -138,16 +137,11 @@ with tab1:
             })
 
         results_df = pd.DataFrame(history).set_index("Day")
-        
-        # Calculations for UI
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
 
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
-
-        st.subheader("📦 Work-In-Progress (WIP) History")
-        st.dataframe(results_df, use_container_width=True)
 
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
@@ -156,15 +150,13 @@ with tab1:
         c2.metric("Throughput (T)", round(total_fg / num_days, 2))
         c3.metric("Total WIP (Sum)", sum_total_wip)
 
-        st.subheader("📈 Performance Trends")
-        st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
-
-        # --- Logging Logic ---
+        # Logging Logic
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
-        
-        # UPDATED: Capture all individual WIP station values for the log
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in initial_wip.items()])
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
+        
+        # Calculate individual entropies for system-wide stats
+        all_entropies = [calculate_entropy(st_output[m]) for m in members]
         
         user_record["history"].append({
             "Scenarios": scen_label,
@@ -173,16 +165,13 @@ with tab1:
             "Mean Throughput (T)": round(total_fg / num_days, 2),
             "Total WIP (W)": sum_total_wip,
             "Lead Time (L = W / T)": round(sum_total_wip / (total_fg/num_days), 2) if total_fg > 0 else 0,
-            "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
-            "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
+            "Avg Entropy Ḣ": round(np.mean(all_entropies), 3),
+            "Entropy Spread σH": round(np.std(all_entropies), 3)
         })
 
         for m in members:
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
-            # Remove Station A from diagnostic table logic
-            if pair == "A":
-                continue
-                
+            if pair == "A": continue
             h_val = calculate_entropy(st_output[m])
             user_record["stations"].append({
                 "Scenario": scen_label, "Station": f"Station {pair}", "Dice Range": f"{dice_configs[m][0]}-{dice_configs[m][1]}",
@@ -194,6 +183,8 @@ with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
+        st.subheader("Table A: Global Summary History")
+        st.table(df_table_a)
         
         s_df = pd.DataFrame(user_record["stations"])
         metrics = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
@@ -205,23 +196,64 @@ with tab2:
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
                     row_data[s_label] = subset[metric].values[0] if not subset.empty else ""
                 rows.append(row_data)
-        
         df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
-
-        st.subheader("Table A: Global Summary History")
-        st.table(df_table_a)
-        
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics (Buffers Only)")
         st.table(df_table_b)
 
-        st.markdown("---")
-        st.subheader("📥 Export Analytics")
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_table_a.to_excel(writer, sheet_name='Global Summary')
             df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
-        excel_data = output.getvalue()
-        st.download_button(label="Download Analytics as Excel", data=excel_data, file_name=f"Simulation_Analytics_{current_user}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        st.download_button(label="Download Analytics as Excel", data=output.getvalue(), file_name=f"Sim_Data_{current_user}.xlsx")
     else:
-        st.info("No recorded history found for this User ID.")
+        st.info("No recorded history found.")
+
+with tab3:
+    st.title("📖 Simulation Methodology & Logic")
+    st.markdown("""
+    This section defines the mathematical framework used to calculate system performance, dependency, and instability.
+    """)
+
+    st.header("🔄 The Flow Logic (Dependency)")
+    st.markdown("""
+    The system follows **Sequential Dependency**. Station B cannot process more than what is available in the preceding buffer, regardless of its dice capacity.
+    """)
+    st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
+
+    st.markdown("---")
+
+    st.header("📊 Table A: Global Summary Logic")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("### Average Entropy ($\bar{H}$)")
+        st.markdown("Calculates the mean instability across all $M$ workstations.")
+        st.latex(r"\bar{H} = \frac{\sum_{i=1}^{M} H_i}{M}")
+        
+        st.write("### Throughput ($T$)")
+        st.latex(r"T = \frac{\text{Total Finished Goods}}{n \text{ Days}}")
+
+    with col2:
+        st.write("### Entropy Spread ($\sigma H$)")
+        st.markdown("The standard deviation of entropy, identifying stability imbalance.")
+        st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
+        
+        st.write("### Lead Time ($L$)")
+        st.latex(r"L = \frac{\sum \text{Daily Total WIP}}{T}")
+
+    st.markdown("---")
+
+    st.header("🔬 Table B: Station Diagnostics (Entropy)")
+    st.markdown("""
+    Station entropy ($H_i$) measures the probability distribution of output. Higher values indicate higher process variance.
+    """)
+    st.latex(r"H_i = -\sum P(x) \log_2 P(x)")
+    
+    
+    
+    st.info("""
+    **Stability Thresholds:**
+    * **Stable ($H < 2.4$):** Consistent output.
+    * **Variable ($H \geq 2.4$):** Unpredictable output causing WIP spikes.
+    """)
