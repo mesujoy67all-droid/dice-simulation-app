@@ -138,7 +138,10 @@ with tab1:
 
         results_df = pd.DataFrame(history).set_index("Day")
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
-        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
+        
+        # Calculations for metrics
+        tr_val = total_fg / num_days
+        avg_daily_wip = results_df["Daily_Total_WIP"].mean()
 
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
@@ -150,8 +153,8 @@ with tab1:
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Finished Goods", int(total_fg))
-        c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
-        c3.metric("Total WIP (Sum)", sum_total_wip)
+        c2.metric("Throughput Rate (TR)", round(tr_val, 2))
+        c3.metric("Avg Daily WIP", round(avg_daily_wip, 2))
 
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
@@ -165,9 +168,9 @@ with tab1:
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": f"Days={num_days} | {wip_summary} | {dice_info}",
             "Total Finished Goods": int(total_fg),
-            "Throughput Rate (TR)": round(total_fg / num_days, 2),
-            "Total WIP (W)": sum_total_wip,
-            "Lead Time (L = W / TR)": round(sum_total_wip / (total_fg/num_days), 2) if total_fg > 0 else 0,
+            "Throughput Rate (TR)": round(tr_val, 2),
+            "Avg Daily WIP": round(avg_daily_wip, 2),
+            "Lead Time (L = Avg WIP / TR)": round(avg_daily_wip / tr_val, 2) if tr_val > 0 else 0,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
         })
@@ -233,7 +236,6 @@ with tab3:
     st.markdown("### System Architecture")
     st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
     
-    # Visualizing the chain for students
     st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
 
     
@@ -267,8 +269,8 @@ with tab3:
     with col2:
         st.write("### Lead Time ($L$)")
         st.markdown("The average time a unit takes to travel through the entire plant.")
-        st.latex(r"L = \frac{\text{Sum of Daily Total WIP}}{TR}")
-        st.caption("Derived from Little's Law.")
+        st.latex(r"L = \frac{\text{Average WIP per Day}}{TR}")
+        st.caption("Derived from Little's Law: $Inventory = Rate \times Time$.")
 
         st.write("### Entropy Spread ($\sigma H$)")
         st.markdown("Measures the imbalance or variance in stability between stations.")
@@ -292,8 +294,4 @@ with tab3:
     * **Entropy ($H_i$):**
         * **Stable (< 2.4):** Predictable output. The station is consistent.
         * **Variable (≥ 2.4):** High 'jitter.' The station is chaotic, making it hard to predict flow.
-    """)
-
-    st.info("""
-    **Note on 'Interpretation':** The 'Variable' vs 'Stable' tag is a diagnostic to help you identify which station's dice range needs to be tightened (standardized) to improve flow.
     """)
