@@ -146,9 +146,10 @@ with tab1:
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(results_df, use_container_width=True)
 
-        # --- Updated Logging Logic based on Reference Formulas ---
+        # --- Updated Logging Logic ---
+        # Lead Time = Average Total WIP per day / Average Throughput Rate
         throughput_rate = total_fg / num_days
-        avg_wip_per_day = sum_total_wip / num_days  # W-bar
+        avg_wip_per_day = sum_total_wip / num_days 
         lead_time = avg_wip_per_day / throughput_rate if throughput_rate > 0 else 0
 
         scen_id = len(user_record["history"]) + 1
@@ -170,7 +171,7 @@ with tab1:
             "Days, Initial WIP & Dice Range": f"Days={num_days} | {wip_summary} | {dice_info}",
             "Total Finished Goods": int(total_fg),
             "Throughput Rate (TR)": round(throughput_rate, 3),
-            "Avg Daily WIP (W)": round(avg_wip_per_day, 2), 
+            "Avg Daily WIP (W)": round(avg_wip_per_day, 2),
             "Lead Time (L = W / TR)": round(lead_time, 2),
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
@@ -178,8 +179,7 @@ with tab1:
 
         for m in members:
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
-            if pair == "A":
-                continue
+            if pair == "A": continue
                 
             h_val = calculate_entropy(st_output[m])
             user_record["stations"].append({
@@ -227,75 +227,40 @@ with tab2:
 # --- PAGE 3: METHODOLOGY ---
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
-    st.markdown("""
-    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
-    """)
-
-    st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
-    st.markdown("### System Architecture")
-    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
-    st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
-
-    st.info("""
-    **The Student's Guide to Movement Logic:**
-    Imagine a relay race. Even if the second runner is the fastest in the world (high dice roll), they cannot run if the first runner hasn't handed them the baton (low buffer). 
     
-    **The rule is always:** The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
-    """)
+    st.header("🔄 The Flow Logic")
+    st.success("🏭 **Station A** $\longrightarrow$ 📦 **Buffer AB** $\longrightarrow$ ⚙️ **Station B** $\longrightarrow$ 📦 **Buffer BC** ...")
 
     st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
 
     st.markdown("---")
 
     st.header("📊 Table A: Summary History")
-    st.markdown("These formulas aggregate the daily data into strategic performance indicators.")
 
     col1, col2 = st.columns(2)
     with col1:
         st.write("### Throughput Rate ($\overline{T}$)")
-        st.markdown("The average number of units completed per day.")
         st.latex(r"\overline{T} = \frac{\text{Total Finished Goods}}{\text{Total Days}}")
 
         st.write("### Average System Entropy ($\bar{H}$)")
-        st.markdown("The mean level of uncertainty across the entire plant.")
         st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
-        st.caption("Where M is the number of workstations.")
         
     with col2:
         st.write("### Lead Time ($L$)")
-        st.markdown("The average time a unit stays in the system.")
-        
-        # Updated Lead Time Formula per specific request
+        # Updated formula display with escaped curly braces for the text blocks
         st.latex(r"L = \frac{\text{Average Total WIP per Day}}{\text{Average Throughput Rate}}")
         st.latex(r"L = \frac{\bar{W}}{\bar{T}}")
         
-        st.info(f"""
+        # Raw string prefix (r) and escaped braces {{ }} prevents the NameError
+        st.info(r"""
         **Calculation Breakdown:**
-        * **Avg. WIP ($\overline{W}$):** $\sum \text{{Daily Total WIP}} / \text{{Total Days}}$
-        * **Avg. Throughput ($\overline{T}$):** $\text{{Total FG}} / \text{{Total Days}}$
+        * **Avg. WIP ($\bar{W}$):** $\sum \text{{Daily Total WIP}} / \text{{Total Days}}$
+        * **Avg. Throughput ($\bar{T}$):** $\text{{Total FG}} / \text{{Total Days}}$
         """)
 
         st.write("### Entropy Spread ($\sigma H$)")
-        st.markdown("Measures the imbalance or variance in stability between stations.")
         st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
 
     st.markdown("---")
-
     st.header("🔬 Table B: Station-Level Flow Diagnostics")
-    st.markdown("""
-    This table measures **Entropy ($H$)**, which quantifies the uncertainty or 'chaos' in a station's output.
-    """)
-    
     st.latex(r"H = -\sum P(x) \log_2 P(x)")
-
-    st.markdown("""
-    **How to read Table B:**
-    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**—it's where work piles up because this station cannot keep up with the one before it.
-    * **Entropy ($H_i$):**
-        * **Stable (< 2.4):** Predictable output. The station is consistent.
-        * **Variable (≥ 2.4):** High 'jitter.' The station is chaotic, making it hard to predict flow.
-    """)
-
-    st.info("""
-    **Note on 'Interpretation':** The 'Variable' vs 'Stable' tag is a diagnostic to help you identify which station's dice range needs to be tightened (standardized) to improve flow.
-    """)
