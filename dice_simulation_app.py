@@ -146,40 +146,41 @@ with tab1:
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(results_df, use_container_width=True)
 
-        # --- Updated Logging Logic ---
-        # Lead Time = Average Total WIP per day / Average Throughput Rate
-        throughput_rate = total_fg / num_days
-        avg_wip_per_day = sum_total_wip / num_days 
-        lead_time = avg_wip_per_day / throughput_rate if throughput_rate > 0 else 0
-
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
-        c1.metric("Throughput Rate (TR)", round(throughput_rate, 3))
-        c2.metric("Avg Daily WIP (W)", round(avg_wip_per_day, 2))
-        c3.metric("Lead Time (L)", round(lead_time, 2))
+        c1.metric("Total Finished Goods", int(total_fg))
+        c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
+        c3.metric("Total WIP (Sum)", sum_total_wip)
 
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
+        # --- Logging Logic (Updated Lead Time Calculation) ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in initial_wip.items()])
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         
+        # New Lead Time Logic
+        avg_throughput_rate = total_fg / num_days
+        avg_total_wip_per_day = sum_total_wip / num_days
+        calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
+
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": f"Days={num_days} | {wip_summary} | {dice_info}",
             "Total Finished Goods": int(total_fg),
-            "Throughput Rate (TR)": round(throughput_rate, 3),
-            "Avg Daily WIP (W)": round(avg_wip_per_day, 2),
-            "Lead Time (L = W / TR)": round(lead_time, 2),
+            "Throughput Rate (TR)": round(avg_throughput_rate, 2),
+            "Total WIP (W)": sum_total_wip,
+            "Lead Time (L = Avg WIP / TR)": calculated_lead_time,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
         })
 
         for m in members:
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
-            if pair == "A": continue
+            if pair == "A":
+                continue
                 
             h_val = calculate_entropy(st_output[m])
             user_record["stations"].append({
@@ -227,40 +228,50 @@ with tab2:
 # --- PAGE 3: METHODOLOGY ---
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
-    
-    st.header("🔄 The Flow Logic")
-    st.success("🏭 **Station A** $\longrightarrow$ 📦 **Buffer AB** $\longrightarrow$ ⚙️ **Station B** $\longrightarrow$ 📦 **Buffer BC** ...")
+    st.markdown("""
+    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
+    """)
+
+    st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
+    st.markdown("### System Architecture")
+    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
+    st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
+
+    st.info("""
+    **The Student's Guide to Movement Logic:**
+    The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
+    """)
 
     st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
 
     st.markdown("---")
 
     st.header("📊 Table A: Summary History")
-
     col1, col2 = st.columns(2)
     with col1:
-        st.write("### Throughput Rate ($\overline{T}$)")
-        st.latex(r"\overline{T} = \frac{\text{Total Finished Goods}}{\text{Total Days}}")
+        st.write("### Throughput Rate ($TR$)")
+        st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily FG}}{n}")
 
         st.write("### Average System Entropy ($\bar{H}$)")
         st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
         
     with col2:
         st.write("### Lead Time ($L$)")
-        # Updated formula display with escaped curly braces for the text blocks
-        st.latex(r"L = \frac{\text{Average Total WIP per Day}}{\text{Average Throughput Rate}}")
-        st.latex(r"L = \frac{\bar{W}}{\bar{T}}")
-        
-        # Raw string prefix (r) and escaped braces {{ }} prevents the NameError
-        st.info(r"""
-        **Calculation Breakdown:**
-        * **Avg. WIP ($\bar{W}$):** $\sum \text{{Daily Total WIP}} / \text{{Total Days}}$
-        * **Avg. Throughput ($\bar{T}$):** $\text{{Total FG}} / \text{{Total Days}}$
-        """)
+        st.markdown("Calculated based on average daily WIP levels relative to output rate.")
+        st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
 
         st.write("### Entropy Spread ($\sigma H$)")
         st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
 
     st.markdown("---")
+
     st.header("🔬 Table B: Station-Level Flow Diagnostics")
     st.latex(r"H = -\sum P(x) \log_2 P(x)")
+
+    st.markdown("""
+    **How to read Table B:**
+    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**.
+    * **Entropy ($H_i$):**
+        * **Stable (< 2.4):** Predictable output.
+        * **Variable (≥ 2.4):** High 'jitter' or chaos.
+    """)
