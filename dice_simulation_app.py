@@ -233,7 +233,7 @@ with tab2:
         st.table(df_table_b)
 
         st.markdown("---")
-        st.subheader("Table C: Temporal WIP Averages (Day/Week/Month)")
+        st.subheader("Table C: Station Wise WIP Averages (Day/Week/Month)")
         
         rows_c = []
         for scen in s_df['Scenario'].unique():
@@ -319,4 +319,5 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
