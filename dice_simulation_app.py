@@ -53,21 +53,22 @@ current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
 # --- Sidebar: User Controls ---
+st.sidebar.markdown("---")
+st.sidebar.header("Simulation Settings")
+num_members = st.sidebar.number_input("Workstations", min_value=2, value=8, max_value=8)
+num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
+
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members}
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
-st.sidebar.markdown("---")
-st.sidebar.header("Simulation Settings")
-num_members = st.sidebar.number_input("Workstations", min_value=2, value=8, max_value=8)
-num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
-
-st.sidebar.header(f"👤 Active: {current_user}")
-if st.sidebar.button("🚪 Logout & Exit"):
-    st.session_state.authenticated_user = None
-    st.rerun()
+def calculate_entropy(values):
+    if len(values) == 0: return 0
+    unique, counts = np.unique(values, return_counts=True)
+    p = counts / counts.sum()
+    return -np.sum(p * np.log2(p))
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Data Management")
@@ -75,12 +76,10 @@ if st.sidebar.button("🗑️ Clear Whole History"):
     user_record["history"] = []
     user_record["stations"] = []
     st.rerun()
-
-def calculate_entropy(values):
-    if len(values) == 0: return 0
-    unique, counts = np.unique(values, return_counts=True)
-    p = counts / counts.sum()
-    return -np.sum(p * np.log2(p))
+st.sidebar.header(f"👤 Active: {current_user}")
+if st.sidebar.button("🚪 Logout & Exit"):
+    st.session_state.authenticated_user = None
+    st.rerun()
 
 # --- Application Tabs ---
 tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology"])
@@ -311,6 +310,4 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
-
-
 
