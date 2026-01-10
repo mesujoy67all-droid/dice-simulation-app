@@ -52,35 +52,57 @@ if st.session_state.authenticated_user is None:
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
-# --- Sidebar: User Controls ---
-st.sidebar.markdown("---")
+# --- Sidebar: User Controls & Settings ---
+st.sidebar.header(f"👤 Active: {current_user}")
+
+# --- 1. Simulation Settings (Reordered) ---
 st.sidebar.header("Simulation Settings")
-num_members = st.sidebar.number_input("Workstations", min_value=2, value=8, max_value=8)
+
+# A. Dice Range for Each Member
+members_list = [chr(64 + i) for i in range(1, 9)] # Pre-defining for the UI
+dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members_list}
+
+# B. Initial WIP
+wip_keys_list = [f"WIP_{members_list[i]}{members_list[i+1]}" for i in range(len(members_list) - 1)]
+initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys_list}
+
+# C. Days
 num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
 
+# D. Workstations
+num_members = st.sidebar.number_input("Workstations", min_value=2, value=8, max_value=8)
+
+# Finalizing members based on num_members selection
 members = [chr(64 + i) for i in range(1, num_members + 1)]
-dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members}
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
-initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
+if st.sidebar.button("▶ Run & Save Simulation"):
+    # Trigger logic is handled inside the tab to maintain UI structure
+    st.session_state.trigger_sim = True
+else:
+    st.session_state.trigger_sim = False
 
+# --- Bottom Sidebar Items (Logout and Clear History) ---
+# This creates a large gap to push items to the bottom
+for _ in range(10):
+    st.sidebar.write("")
+
+st.sidebar.markdown("---")
+if st.sidebar.button("🗑️ Clear Whole History"):
+    user_record["history"] = []
+    user_record["stations"] = []
+    st.rerun()
+
+if st.sidebar.button("🚪 Logout & Exit"):
+    st.session_state.authenticated_user = None
+    st.rerun()
+
+# --- Utility Functions ---
 def calculate_entropy(values):
     if len(values) == 0: return 0
     unique, counts = np.unique(values, return_counts=True)
     p = counts / counts.sum()
     return -np.sum(p * np.log2(p))
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("Data Management")
-if st.sidebar.button("🗑️ Clear Whole History"):
-    user_record["history"] = []
-    user_record["stations"] = []
-    st.rerun()
-st.sidebar.header(f"👤 Active: {current_user}")
-if st.sidebar.button("🚪 Logout & Exit"):
-    st.session_state.authenticated_user = None
-    st.rerun()
-
 
 # --- Application Tabs ---
 tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology"])
@@ -88,7 +110,7 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Perf
 with tab1:
     st.title("🚀 Live Operations Console")
     
-    if st.sidebar.button("▶ Run & Save Simulation"):
+    if st.session_state.trigger_sim:
         # 1. Capacity Generation
         dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
         df_dice = pd.DataFrame(dice_rolls)
@@ -96,7 +118,7 @@ with tab1:
         df_dice.index.name = "Day"
 
         # 2. Simulation Logic
-        wip_buffers = initial_wip.copy()
+        wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
         total_fg = 0
         st_output = defaultdict(list)
@@ -157,7 +179,7 @@ with tab1:
 
         # --- Logging Logic ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
-        wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in initial_wip.items()])
+        wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in wip_buffers.items()])
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         
         avg_throughput_rate = total_fg / num_days
@@ -177,8 +199,7 @@ with tab1:
 
         for m in members:
             pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
-            if pair == "A":
-                continue
+            if pair == "A": continue
                 
             h_val = calculate_entropy(st_output[m])
             user_record["stations"].append({
@@ -190,7 +211,6 @@ with tab1:
 with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
-        # --- Table A & B (Existing Logic Preserved) ---
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
         s_df = pd.DataFrame(user_record["stations"])
         
@@ -205,7 +225,6 @@ with tab2:
                 rows_b.append(row_data)
         df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
 
-        # --- NEW Table C: Temporal WIP Averages ---
         st.subheader("Table A: Summary History")
         st.table(df_table_a)
         
@@ -216,30 +235,20 @@ with tab2:
         st.markdown("---")
         st.subheader("Table C: Temporal WIP Averages (Day/Week/Month)")
         
-        # Calculation Logic for Table C
         rows_c = []
         for scen in s_df['Scenario'].unique():
-            # Extract total days from Scenario label or the historical record
-            # We use the 'history' record to find the day count for this scenario
-            scen_idx = int(scen.split("#")[-1]) if "#" in scen else 1
-            total_sim_days = num_days # Current session num_days
-            
             for period in ["Day-wise Avg WIP", "Week-wise Avg WIP", "Month-wise Avg WIP"]:
                 row_data = {"Scenario": scen, "Time Metric": period}
-                
                 for s_label in s_df['Station'].unique():
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
                     if not subset.empty:
-                        # Logic: Get Total WIP (Avg WIP * Days) then apply new denominators
-                        total_wip_accumulated = subset["Avg WIP"].values[0] * total_sim_days
-                        
+                        total_wip_accumulated = subset["Avg WIP"].values[0] * num_days
                         if period == "Day-wise Avg WIP":
-                            val = total_wip_accumulated / total_sim_days
+                            val = total_wip_accumulated / num_days
                         elif period == "Week-wise Avg WIP":
-                            val = total_wip_accumulated / (total_sim_days / 5)
-                        else: # Month-wise
-                            val = total_wip_accumulated / (total_sim_days / 20)
-                        
+                            val = total_wip_accumulated / (num_days / 5)
+                        else: 
+                            val = total_wip_accumulated / (num_days / 20)
                         row_data[s_label] = round(val, 2)
                     else:
                         row_data[s_label] = 0.0
@@ -248,7 +257,6 @@ with tab2:
         df_table_c = pd.DataFrame(rows_c).set_index(["Scenario", "Time Metric"])
         st.table(df_table_c)
 
-        # --- Updated Export Logic ---
         st.markdown("---")
         st.subheader("📥 Export Analytics")
         output = io.BytesIO()
@@ -261,56 +269,18 @@ with tab2:
     else:
         st.info("No recorded history found for this User ID.")
 
-# --- PAGE 3: METHODOLOGY ---
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
-    st.markdown("""
-    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
-    """)
-
     st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
-    st.markdown("### System Architecture")
     st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
     st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
-
-    st.info("""
-    **The Student's Guide to Movement Logic:**
-    The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
-    """)
-
     st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
-
     st.markdown("---")
-
     st.header("📊 Table A: Summary History")
     col1, col2 = st.columns(2)
     with col1:
         st.write("### Throughput Rate ($TR$)")
         st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily FG}}{n}")
-
-        st.write("### Average System Entropy ($\bar{H}$)")
-        st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
-        
     with col2:
         st.write("### Lead Time ($L$)")
-        st.markdown("Calculated based on average daily WIP levels relative to output rate.")
         st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
-
-        st.write("### Entropy Spread ($\sigma H$)")
-        st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
-
-    st.markdown("---")
-
-    st.header("🔬 Table B: Station-Level Flow Diagnostics")
-    st.latex(r"H = -\sum P(x) \log_2 P(x)")
-
-    st.markdown("""
-    **How to read Table B:**
-    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**.
-    * **Entropy ($H_i$):**
-        * **Stable (< 2.4):** Predictable output.
-        * **Variable (≥ 2.4):** High 'jitter' or chaos.
-    """)
-
-
-
