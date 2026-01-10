@@ -64,6 +64,12 @@ wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
+def calculate_entropy(values):
+    if len(values) == 0: return 0
+    unique, counts = np.unique(values, return_counts=True)
+    p = counts / counts.sum()
+    return -np.sum(p * np.log2(p))
+
 st.sidebar.markdown("---")
 st.sidebar.subheader("Data Management")
 if st.sidebar.button("🗑️ Clear Whole History"):
@@ -74,12 +80,6 @@ st.sidebar.header(f"👤 Active: {current_user}")
 if st.sidebar.button("🚪 Logout & Exit"):
     st.session_state.authenticated_user = None
     st.rerun()
-
-def calculate_entropy(values):
-    if len(values) == 0: return 0
-    unique, counts = np.unique(values, return_counts=True)
-    p = counts / counts.sum()
-    return -np.sum(p * np.log2(p))
 
 
 # --- Application Tabs ---
@@ -311,5 +311,6 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
