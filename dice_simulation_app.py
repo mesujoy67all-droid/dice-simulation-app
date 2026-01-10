@@ -269,18 +269,54 @@ with tab2:
     else:
         st.info("No recorded history found for this User ID.")
 
+# --- PAGE 3: METHODOLOGY ---
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
+    st.markdown("""
+    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
+    """)
+
     st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
+    st.markdown("### System Architecture")
     st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
     st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
+
+    st.info("""
+    **The Student's Guide to Movement Logic:**
+    The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
+    """)
+
     st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
+
     st.markdown("---")
+
     st.header("📊 Table A: Summary History")
     col1, col2 = st.columns(2)
     with col1:
         st.write("### Throughput Rate ($TR$)")
         st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily FG}}{n}")
+
+        st.write("### Average System Entropy ($\bar{H}$)")
+        st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
+        
     with col2:
         st.write("### Lead Time ($L$)")
+        st.markdown("Calculated based on average daily WIP levels relative to output rate.")
         st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
+
+        st.write("### Entropy Spread ($\sigma H$)")
+        st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
+
+    st.markdown("---")
+
+    st.header("🔬 Table B: Station-Level Flow Diagnostics")
+    st.latex(r"H = -\sum P(x) \log_2 P(x)")
+
+    st.markdown("""
+    **How to read Table B:**
+    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**.
+    * **Entropy ($H_i$):**
+        * **Stable (< 2.4):** Predictable output.
+        * **Variable (≥ 2.4):** High 'jitter' or chaos.
+    """)
+
