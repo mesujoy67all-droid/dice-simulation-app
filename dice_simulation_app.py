@@ -28,8 +28,13 @@ def auth_gateway():
             if user_id in st.session_state.user_db:
                 st.error(f"User ID '{user_id}' is already taken.")
             elif user_id and pwd:
-                # IMPORTANT: Initialize raw_wip_data list here
-                st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": [], "raw_wip_data": []}
+                # RE-INITIALIZED: Ensuring all necessary keys exist
+                st.session_state.user_db[user_id] = {
+                    "password": pwd, 
+                    "history": [], 
+                    "stations": [], 
+                    "raw_wip_data": []
+                }
                 st.success("Account created! Please switch to Login mode.")
             else:
                 st.warning("Fields cannot be empty.")
@@ -53,18 +58,13 @@ if st.session_state.authenticated_user is None:
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
-# Ensure the raw_wip_data key exists for older accounts
-if "raw_wip_data" not in user_record:
-    user_record["raw_wip_data"] = []
-
-# --- Sidebar ---
+# Sidebar logic for resetting
 st.sidebar.header(f"👤 Active: {current_user}")
 if st.sidebar.button("🚪 Logout & Exit"):
     st.session_state.authenticated_user = None
     st.rerun()
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("Data Management")
 if st.sidebar.button("🗑️ Clear Whole History"):
     user_record["history"] = []
     user_record["stations"] = []
@@ -134,7 +134,6 @@ with tab1:
             history.append({"Day": day, **wip_buffers.copy(), "Daily_Total_WIP": sum(wip_buffers.values()), "Day Wise Total FG": daily_fg_out})
 
         results_df = pd.DataFrame(history).set_index("Day")
-        results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
@@ -144,21 +143,20 @@ with tab1:
         c1, c2 = st.columns(2)
         c1.metric("Total Finished Goods", int(total_fg))
         c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
-        # Point 1: Total WIP Sum removed here
+        # POINT 1: Total WIP (Sum) metric is removed from here.
 
-        # Logging Logic
+        # Data Processing for Storage
         scen_label = f"Scenario #{scen_id}"
-        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
-        avg_throughput_rate = total_fg / num_days
-        avg_total_wip_per_day = sum_total_wip / num_days
-        calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
+        avg_tr = total_fg / num_days
+        avg_wip = results_df["Daily_Total_WIP"].mean()
+        calc_lt = round(avg_wip / avg_tr, 2) if avg_tr > 0 else 0
 
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": f"Days={num_days} | {dice_configs}",
             "Total Finished Goods": int(total_fg),
-            "Throughput Rate (TR)": round(avg_throughput_rate, 2),
-            "Lead Time (L)": calculated_lead_time,
+            "Throughput Rate (TR)": round(avg_tr, 2),
+            "Lead Time (L)": calc_lt,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3)
         })
 
@@ -167,15 +165,15 @@ with tab1:
             if pair == "A": continue
             user_record["stations"].append({
                 "Scenario": scen_label, "Station": f"Station {pair}", 
-                "Tot Output": sum(st_output[m]), "Avg WIP": round(np.mean(st_wip_trend[pair]), 2) if pair in st_wip_trend else 0,
+                "Tot Output": sum(st_output[m]), "Avg WIP": round(np.mean(st_wip_trend[pair]), 2),
                 "Entropy Hi": round(calculate_entropy(st_output[m]), 3), "Interpretation": "Variable" if calculate_entropy(st_output[m]) > 2.4 else "Stable"
             })
             
-        # Point 3: Save raw WIP data for Table C
-        raw_wip_df = results_df[[c for c in results_df.columns if len(c)==2 and c.isupper()]].copy()
-        raw_wip_df["Scenario"] = scen_label
-        user_record["raw_wip_data"].append(raw_wip_df.reset_index())
-        st.success(f"Simulation {scen_label} complete and saved!")
+        # POINT 3: Storing Raw Data for the new Table C
+        raw_wip = results_df[[c for c in results_df.columns if len(c)==2 and c.isupper()]].copy()
+        raw_wip["Scenario"] = scen_label
+        user_record["raw_wip_data"].append(raw_wip.reset_index())
+        st.success(f"Scenario {scen_id} saved!")
 
 with tab2:
     st.title("📊 Strategic Performance Analytics")
@@ -184,10 +182,11 @@ with tab2:
         st.subheader("Table A: Summary History")
         st.table(pd.DataFrame(user_record["history"]).set_index("Scenarios"))
         
-        # Table B: Station Level (Dice Range Removed)
+        # Table B: Station Level
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
         s_df = pd.DataFrame(user_record["stations"])
+        # POINT 2: "Dice Range" removed from the metrics list
         metrics = ["Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"] 
         rows = []
         for scen in s_df['Scenario'].unique():
@@ -199,40 +198,36 @@ with tab2:
                 rows.append(row_data)
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
 
-        # Point 3: New Table C Section
+        # POINT 3: Table C - Multi-Period WIP Analysis
         st.markdown("---")
-        st.subheader("Table C: Multi-Period Station WIP Analysis")
-        
+        st.subheader("Table C: Station-Wise WIP Aggregations")
         if user_record["raw_wip_data"]:
-            all_raw = pd.concat(user_record["raw_wip_data"])
-            target_scen = st.selectbox("Select Scenario for WIP breakdown:", all_raw["Scenario"].unique())
+            combined_raw = pd.concat(user_record["raw_wip_data"])
+            selected_scen = st.selectbox("Detailed WIP breakdown for:", combined_raw["Scenario"].unique())
             
-            # Filter data for chosen scenario
-            df_c = all_raw[all_raw["Scenario"] == target_scen].drop(columns="Scenario").set_index("Day")
-            station_cols = df_c.columns.tolist()
+            scen_data = combined_raw[combined_raw["Scenario"] == selected_scen].drop(columns="Scenario").set_index("Day")
+            st_cols = scen_data.columns.tolist()
 
-            # Display tabs for Day, Week, Month
-            c_day, c_week, c_month = st.tabs(["Daily WIP", "Weekly Avg WIP (5 Days)", "Monthly Avg WIP (20 Days)"])
+            c1, c2, c3 = st.tabs(["Daily WIP", "Weekly Avg (5 Days)", "Monthly Avg (20 Days)"])
             
-            with c_day:
-                st.dataframe(df_c, use_container_width=True)
+            with c1:
+                st.write("**Every Station Day-Wise WIP**")
+                st.dataframe(scen_data, use_container_width=True)
             
-            with c_week:
-                # Group by 5-day periods
-                df_c_reset = df_c.reset_index()
-                df_c_reset["Week"] = (df_c_reset["Day"] - 1) // 5 + 1
-                week_df = df_c_reset.groupby("Week")[station_cols].mean().round(2)
-                st.dataframe(week_avg_display := week_df, use_container_width=True)
+            with c2:
+                st.write("**Every Station Week-Wise Avg WIP**")
+                df_reset = scen_data.reset_index()
+                df_reset["Week"] = (df_reset["Day"] - 1) // 5 + 1
+                st.dataframe(df_reset.groupby("Week")[st_cols].mean().round(2), use_container_width=True)
             
-            with c_month:
-                # Group by 20-day periods
-                df_c_reset = df_c.reset_index()
-                df_c_reset["Month"] = (df_c_reset["Day"] - 1) // 20 + 1
-                month_df = df_c_reset.groupby("Month")[station_cols].mean().round(2)
-                st.dataframe(month_df, use_container_width=True)
+            with c3:
+                st.write("**Every Station Month-Wise Avg WIP**")
+                df_reset = scen_data.reset_index()
+                df_reset["Month"] = (df_reset["Day"] - 1) // 20 + 1
+                st.dataframe(df_reset.groupby("Month")[st_cols].mean().round(2), use_container_width=True)
     else:
-        st.info("No recorded history. Please run a simulation in Tab 1.")
+        st.info("No recorded history found.")
 
 with tab3:
     st.title("📖 Methodology")
-    st.markdown("Explanation of simulation logic, including movement and entropy calculations.")
+    st.markdown("System architecture and movement logic overview.")
