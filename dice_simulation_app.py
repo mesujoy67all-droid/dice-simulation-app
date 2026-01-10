@@ -189,14 +189,12 @@ with tab1:
 
 with tab2:
     st.title("📊 Strategic Performance Analytics")
-    if user_record["history"]:
+    if user_record["history"] and "results_df" in locals():
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
-        
         s_df = pd.DataFrame(user_record["stations"])
         
-        # --- Updated Metrics: Removed 'Dice Range' from Table B ---
+        # --- Existing Table B Logic ---
         metrics = ["Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
-        
         rows = []
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics):
@@ -208,6 +206,7 @@ with tab2:
         
         df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
 
+        # --- Table A & B Rendering ---
         st.subheader("Table A: Summary History")
         st.table(df_table_a)
         
@@ -215,16 +214,48 @@ with tab2:
         st.subheader("Table B: Station-Level Flow Diagnostics (Buffers Only)")
         st.table(df_table_b)
 
+        # --- NEW: Table C: Temporal WIP Analytics ---
+        st.markdown("---")
+        st.subheader("Table C: Temporal WIP Analytics (Current Scenario)")
+        
+        # We use the results_df from the latest simulation run
+        # Filter only the columns that represent WIP buffers
+        wip_cols = [col for col in results_df.columns if col.startswith("WIP_")]
+        temp_wip_df = results_df[wip_cols].copy()
+        
+        # Rename columns for cleaner display (e.g., WIP_AB -> Station AB)
+        temp_wip_df.columns = [c.replace("WIP_", "Station ") for c in temp_wip_df.columns]
+        
+        temporal_rows = []
+        
+        # 1. Day Wise Average (Avg per day across the whole simulation)
+        day_avg = temp_wip_df.mean().to_dict()
+        temporal_rows.append({"Time Scale": "Day Wise Average", **day_avg})
+        
+        # 2. Week Wise Average (5 days = 1 week)
+        # We group by (index-1)//5 to get 5-day buckets, then mean of those buckets, then mean of weeks
+        week_avg = temp_wip_df.groupby((temp_wip_df.index - 1) // 5).mean().mean().to_dict()
+        temporal_rows.append({"Time Scale": "Week Wise Average (5-Day)", **week_avg})
+        
+        # 3. Month Wise Average (20 days = 1 month)
+        month_avg = temp_wip_df.groupby((temp_wip_df.index - 1) // 20).mean().mean().to_dict()
+        temporal_rows.append({"Time Scale": "Month Wise Average (20-Day)", **month_avg})
+        
+        df_table_c = pd.DataFrame(temporal_rows).set_index("Time Scale")
+        st.table(df_table_c.applymap(lambda x: round(x, 2) if isinstance(x, (int, float)) else x))
+
+        # --- Updated Export ---
         st.markdown("---")
         st.subheader("📥 Export Analytics")
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_table_a.to_excel(writer, sheet_name='Summary History')
             df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
+            df_table_c.to_excel(writer, sheet_name='Temporal WIP')
         excel_data = output.getvalue()
         st.download_button(label="Download Analytics as Excel", data=excel_data, file_name=f"Simulation_Analytics_{current_user}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     else:
-        st.info("No recorded history found for this User ID.")
+        st.info("No recorded history found. Please run a simulation in the 'Live Operations Console' first.")
 
 # --- PAGE 3: METHODOLOGY ---
 with tab3:
@@ -276,3 +307,4 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
