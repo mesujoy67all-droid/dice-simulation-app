@@ -67,7 +67,7 @@ if st.sidebar.button("🗑️ Clear Whole History"):
 
 st.sidebar.markdown("---")
 st.sidebar.header("Simulation Settings")
-num_members = st.sidebar.number_input("Workstations", min_value=2, value=8)
+num_members = st.sidebar.number_input("Workstations", min_value=2, value=8, max_value=8)
 num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
 
 members = [chr(64 + i) for i in range(1, num_members + 1)]
@@ -311,4 +311,5 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
