@@ -184,7 +184,26 @@ with tab2:
         st.markdown("---")
 
         st.subheader("Table B: Station-Level Flow Diagnostics (Buffers Only)")
-        st.info("No change to existing Table B")
+          # --- Updated Metrics: Removed 'Dice Range' from Table B ---
+        metrics = ["Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
+        
+        rows = []
+        for scen in s_df['Scenario'].unique():
+            for i, metric in enumerate(metrics):
+                row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
+                for s_label in s_df['Station'].unique():
+                    subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
+                    row_data[s_label] = subset[metric].values[0] if not subset.empty else ""
+                rows.append(row_data)
+        
+        df_table_b = pd.DataFrame(rows).set_index(["Scenario", "Metric"])
+
+        st.subheader("Table A: Summary History")
+        st.table(df_table_a)
+        
+        st.markdown("---")
+        st.subheader("Table B: Station-Level Flow Diagnostics (Buffers Only)")
+        st.table(df_table_b)
 
         st.markdown("---")
         st.subheader("Table C: Station-wise Average WIP (Day / Week / Month)")
@@ -205,10 +224,63 @@ with tab2:
 
         df_table_c = pd.DataFrame(rows).set_index("Station")
         st.table(df_table_c)
-
+        st.markdown("---")
+        st.subheader("📥 Export Analytics")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_table_a.to_excel(writer, sheet_name='Summary History')
+            df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
+        excel_data = output.getvalue()
+        st.download_button(label="Download Analytics as Excel", data=excel_data, file_name=f"Simulation_Analytics_{current_user}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     else:
         st.info("No recorded history found for this User ID.")
-
+# --- PAGE 3: METHODOLOGY ---
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
-    st.markdown("Methodology remains unchanged.")
+    st.markdown("""
+    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
+    """)
+
+    st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
+    st.markdown("### System Architecture")
+    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
+    st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
+
+    st.info("""
+    **The Student's Guide to Movement Logic:**
+    The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
+    """)
+
+    st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
+
+    st.markdown("---")
+
+    st.header("📊 Table A: Summary History")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("### Throughput Rate ($TR$)")
+        st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily FG}}{n}")
+
+        st.write("### Average System Entropy ($\bar{H}$)")
+        st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
+        
+    with col2:
+        st.write("### Lead Time ($L$)")
+        st.markdown("Calculated based on average daily WIP levels relative to output rate.")
+        st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
+
+        st.write("### Entropy Spread ($\sigma H$)")
+        st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
+
+    st.markdown("---")
+
+    st.header("🔬 Table B: Station-Level Flow Diagnostics")
+    st.latex(r"H = -\sum P(x) \log_2 P(x)")
+
+    st.markdown("""
+    **How to read Table B:**
+    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**.
+    * **Entropy ($H_i$):**
+        * **Stable (< 2.4):** Predictable output.
+        * **Variable (≥ 2.4):** High 'jitter' or chaos.
+    """)
