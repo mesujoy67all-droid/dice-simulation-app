@@ -233,7 +233,7 @@ with tab2:
         st.table(df_table_b)
 
         st.markdown("---")
-        st.subheader("Table C: Station Wise WIP Averages (Day/Week/Month)")
+        st.subheader("Table C: Temporal WIP Averages (Day/Week/Month)")
         
         rows_c = []
         for scen in s_df['Scenario'].unique():
@@ -263,7 +263,7 @@ with tab2:
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_table_a.to_excel(writer, sheet_name='Summary History')
             df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
-            df_table_c.reset_index().to_excel(writer, sheet_name='Station Wise WIP', index=False)
+            df_table_c.reset_index().to_excel(writer, sheet_name='Temporal WIP', index=False)
         excel_data = output.getvalue()
         st.download_button(label="Download Full Analytics Excel", data=excel_data, file_name=f"Full_Simulation_{current_user}.xlsx")
     else:
@@ -319,6 +319,3 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
-
-
-
