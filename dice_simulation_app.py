@@ -28,7 +28,8 @@ def auth_gateway():
             if user_id in st.session_state.user_db:
                 st.error(f"User ID '{user_id}' is already taken.")
             elif user_id and pwd:
-                st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": [], "raw_results": []}
+                # Added 'raw_data' to store full daily results for Table C
+                st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": [], "raw_data": []}
                 st.success("Account created! Please switch to Login mode.")
             else:
                 st.warning("Fields cannot be empty.")
@@ -52,7 +53,11 @@ if st.session_state.authenticated_user is None:
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
-# --- Sidebar ---
+# Ensure raw_data key exists for older accounts
+if "raw_data" not in user_record:
+    user_record["raw_data"] = []
+
+# --- Sidebar: User Controls ---
 st.sidebar.header(f"👤 Active: {current_user}")
 if st.sidebar.button("🚪 Logout & Exit"):
     st.session_state.authenticated_user = None
@@ -63,7 +68,7 @@ st.sidebar.subheader("Data Management")
 if st.sidebar.button("🗑️ Clear Whole History"):
     user_record["history"] = []
     user_record["stations"] = []
-    user_record["raw_results"] = []
+    user_record["raw_data"] = []
     st.rerun()
 
 st.sidebar.markdown("---")
@@ -74,6 +79,7 @@ num_days = st.sidebar.number_input("Days", min_value=1, value=100)
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members}
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
+
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
 def calculate_entropy(values):
@@ -89,15 +95,18 @@ with tab1:
     st.title("🚀 Live Operations Console")
     
     if st.sidebar.button("▶ Run & Save Simulation"):
+        # 1. Capacity Generation
         dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
         df_dice = pd.DataFrame(dice_rolls)
         df_dice.index = range(1, num_days + 1)
+        df_dice.index.name = "Day"
 
+        # 2. Simulation Logic
         wip_buffers = initial_wip.copy()
         history = []
-        total_fg = 0
         st_output = defaultdict(list)
         st_wip_trend = defaultdict(list)
+        total_fg = 0
 
         for day in df_dice.index:
             day_rolls = df_dice.loc[day]
@@ -126,37 +135,49 @@ with tab1:
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
 
-            history.append({"Day": day, **wip_buffers.copy(), "Daily_Total_WIP": sum(wip_buffers.values()), "Day Wise Total FG": daily_fg_out})
+            history.append({
+                "Day": day, 
+                **wip_buffers.copy(), 
+                "Daily_Total_WIP": sum(wip_buffers.values()), 
+                "Day Wise Total FG": daily_fg_out
+            })
 
         results_df = pd.DataFrame(history).set_index("Day")
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
-        
+        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
+
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
+
+        st.subheader("📦 Work-In-Progress (WIP) History")
+        st.dataframe(results_df, use_container_width=True)
 
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2 = st.columns(2)
         c1.metric("Total Finished Goods", int(total_fg))
         c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
-        # REMOVED: Total WIP (Sum) metric here per request
+        # Total WIP (Sum) Metric Removed as requested
 
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
-        # Logging Logic
+        # --- Logging Logic ---
         scen_label = f"Scenario #{scen_id}"
-        avg_throughput_rate = total_fg / num_days
-        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
-        avg_total_wip_per_day = sum_total_wip / num_days
-        calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
+        wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in initial_wip.items()])
+        dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
+        
+        avg_tr = total_fg / num_days
+        avg_wip = sum_total_wip / num_days
+        lt = round(avg_wip / avg_tr, 2) if avg_tr > 0 else 0
 
         user_record["history"].append({
             "Scenarios": scen_label,
-            "Days, Initial WIP & Dice Range": f"Days={num_days} | {dice_configs}",
+            "Days, Initial WIP & Dice Range": f"Days={num_days} | {wip_summary} | {dice_info}",
             "Total Finished Goods": int(total_fg),
-            "Throughput Rate (TR)": round(avg_throughput_rate, 2),
-            "Lead Time (L)": calculated_lead_time,
+            "Throughput Rate (TR)": round(avg_tr, 2),
+            "Total WIP (W)": sum_total_wip,
+            "Lead Time (L)": lt,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3)
         })
 
@@ -169,24 +190,25 @@ with tab1:
                 "Tot Output": sum(st_output[m]), "Avg WIP": round(np.mean(st_wip_trend[pair]), 2) if pair in st_wip_trend else 0,
                 "Entropy Hi": round(h_val, 3), "Interpretation": "Variable" if h_val > 2.4 else "Stable"
             })
-            
-        # Store raw results for Time-Phased analysis
-        temp_df = results_df.copy()
-        temp_df['Scenario'] = scen_label
-        user_record["raw_results"].append(temp_df)
+        
+        # Save raw results for the new Table C analysis
+        raw_results = results_df.copy()
+        raw_results['Scenario'] = scen_label
+        user_record["raw_data"].append(raw_results)
 
 with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
-        # Table A
+        # --- Table A: Summary ---
         st.subheader("Table A: Summary History")
         st.table(pd.DataFrame(user_record["history"]).set_index("Scenarios"))
         
-        # Table B: Station Level (Dice Range Removed)
+        # --- Table B: Station Diagnostics ---
         st.markdown("---")
-        st.subheader("Table B: Station-Level Flow Diagnostics")
+        st.subheader("Table B: Station-Level Flow Diagnostics (Buffers Only)")
         s_df = pd.DataFrame(user_record["stations"])
-        metrics = ["Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"] # Dice Range Removed
+        # Removed "Dice Range" from the metrics list
+        metrics = ["Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
         rows = []
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics):
@@ -197,30 +219,52 @@ with tab2:
                 rows.append(row_data)
         st.table(pd.DataFrame(rows).set_index(["Scenario", "Metric"]))
 
-        # --- NEW TABLE: Time-Phased WIP Analysis ---
+        # --- Table C: Time-Phased WIP Analysis ---
         st.markdown("---")
-        st.subheader("Table C: Time-Phased WIP Analysis (Station-Wise)")
+        st.subheader("Table C: Multi-Temporal WIP Analysis (Station-Wise)")
         
-        if user_record["raw_results"]:
-            latest_res = user_record["raw_results"][-1].copy()
-            # Identify WIP columns
-            wip_cols = [c for c in latest_res.columns if len(c) == 2 and c.isupper()]
+        if user_record["raw_data"]:
+            # Display based on the latest simulation run
+            latest_data = user_record["raw_data"][-1]
+            # Filter only the WIP buffer columns (e.g., AB, BC, etc.)
+            wip_cols = [c for c in latest_data.columns if "WIP_" in c]
+            clean_wip_cols = [c.replace("WIP_", "") for c in wip_cols]
             
-            # 1. Day Wise (Last 5 days for brevity)
-            st.write("**Day-Wise WIP (Daily Snapshot)**")
-            st.dataframe(latest_res[wip_cols].tail(10), use_container_width=True)
-            
-            # 2. Week Wise (5 Days)
-            st.write("**Week-Wise Average WIP (Every 5 Days)**")
-            latest_res['Week'] = (latest_res.index - 1) // 5 + 1
-            week_wip = latest_res.groupby('Week')[wip_cols].mean().round(2)
-            st.dataframe(week_wip, use_container_width=True)
-            
-            # 3. Month Wise (20 Days)
-            st.write("**Month-Wise Average WIP (Every 20 Days)**")
-            latest_res['Month'] = (latest_res.index - 1) // 20 + 1
-            month_wip = latest_res.groupby('Month')[wip_cols].mean().round(2)
-            st.dataframe(month_wip, use_container_width=True)
+            wip_df = latest_data[wip_cols].copy()
+            wip_df.columns = clean_wip_cols
 
+            # Time grouping logic
+            wip_df['Week'] = (wip_df.index - 1) // 5 + 1
+            wip_df['Month'] = (wip_df.index - 1) // 20 + 1
+
+            c_type = st.selectbox("Select Temporal View:", ["Day-Wise (Raw)", "Week-Wise (Avg)", "Month-Wise (Avg)"])
+
+            if c_type == "Day-Wise (Raw)":
+                st.dataframe(wip_df[clean_wip_cols], use_container_width=True)
+            elif c_type == "Week-Wise (Avg)":
+                week_avg = wip_df.groupby('Week')[clean_wip_cols].mean().round(2)
+                st.dataframe(week_avg, use_container_width=True)
+            else:
+                month_avg = wip_df.groupby('Month')[clean_wip_cols].mean().round(2)
+                st.dataframe(month_avg, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("📥 Export Analytics")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            pd.DataFrame(user_record["history"]).to_excel(writer, sheet_name='Summary')
+            if user_record["raw_data"]:
+                user_record["raw_data"][-1].to_excel(writer, sheet_name='Full_WIP_Log')
+        
+        st.download_button(label="Download Analytics as Excel", data=output.getvalue(), file_name=f"Simulation_{current_user}.xlsx")
     else:
-        st.info("No recorded history found. Please run a simulation first.")
+        st.info("No recorded history found for this User ID.")
+
+with tab3:
+    st.title("📖 Simulation Methodology & Logic")
+    st.markdown("""
+    ### Time Phasing Logic
+    * **Day-Wise:** Direct WIP counts at the end of each simulated day.
+    * **Week-Wise (5 Days):** The arithmetic mean of WIP levels recorded over a 5-day production cycle.
+    * **Month-Wise (20 Days):** The arithmetic mean of WIP levels recorded over a 20-day production cycle.
+    """)
