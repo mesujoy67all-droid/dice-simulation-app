@@ -55,26 +55,35 @@ user_record = st.session_state.user_db[current_user]
 # --- Sidebar: User Controls & Settings ---
 st.sidebar.header(f"👤 Active: {current_user}")
 
-# --- 1. Simulation Settings ---
+# --- 1. Simulation Settings (Reordered) ---
 st.sidebar.header("Simulation Settings")
 
-members_list = [chr(64 + i) for i in range(1, 9)]
+# A. Dice Range for Each Member
+members_list = [chr(64 + i) for i in range(1, 9)] # Pre-defining for the UI
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members_list}
 
+# B. Initial WIP
 wip_keys_list = [f"WIP_{members_list[i]}{members_list[i+1]}" for i in range(len(members_list) - 1)]
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys_list}
 
+# C. Days
 num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
+
+# D. Workstations
 num_members = st.sidebar.number_input("Workstations", min_value=2, value=8, max_value=8)
 
+# Finalizing members based on num_members selection
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
 if st.sidebar.button("▶ Run & Save Simulation"):
+    # Trigger logic is handled inside the tab to maintain UI structure
     st.session_state.trigger_sim = True
 else:
     st.session_state.trigger_sim = False
 
+# --- Bottom Sidebar Items (Logout and Clear History) ---
+# This creates a large gap to push items to the bottom
 for _ in range(10):
     st.sidebar.write("")
 
@@ -111,40 +120,44 @@ with tab1:
         # 2. Simulation Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
+        movement_history = [] # NEW: To track actual penny movement
         total_fg = 0
         st_output = defaultdict(list)
         st_wip_trend = defaultdict(list)
-        
-        # New: Track actual movement for the Pennies Table
-        pennies_movement = defaultdict(list)
 
         for day in df_dice.index:
             day_rolls = df_dice.loc[day]
+            daily_movements = {"Day": day} # Track movements for this specific day
             daily_fg_out = 0
+            
             for i, m in enumerate(members):
                 roll = day_rolls[m]
                 if i == 0:
-                    # Member A always moves full dice roll (Source)
+                    # Station A always moves its full dice roll (source)
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     wip_buffers[nxt] += roll
                     st_output[m].append(roll)
-                    pennies_movement[m].append(roll)
+                    daily_movements[m] = roll
                 elif i == len(members) - 1:
+                    # Last Station
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     daily_fg_out = move
                     total_fg += move
                     st_output[m].append(move)
-                    pennies_movement[m].append(move)
+                    daily_movements[m] = move
                 else:
+                    # Middle Stations
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     wip_buffers[nxt] += move
                     st_output[m].append(move)
-                    pennies_movement[m].append(move)
+                    daily_movements[m] = move
+
+            movement_history.append(daily_movements)
 
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
@@ -156,61 +169,27 @@ with tab1:
                 "Day Wise Total FG": daily_fg_out
             })
 
-        results_df = pd.DataFrame(history).set_index("Day")
-        # =========================================================
-# 🎲 Pennies Movement Table (Per Member – Actual Flow)
-# =========================================================
-pennies_flow = []
-
-for day in df_dice.index:
-    row = {"Day": day}
-    for i, m in enumerate(members):
-        if i == 0:
-            # Member A → Dice Roll (Capacity)
-            row[m] = df_dice.loc[day, m]
-        else:
-            # Member B onwards → Actual pennies received
-            row[m] = st_output[m][day - 1]
-    pennies_flow.append(row)
-
-df_pennies_flow = pd.DataFrame(pennies_flow).set_index("Day")
-
-# --- Add Total FG Row ---
-df_pennies_flow.loc["Total FG"] = {
-    m: sum(st_output[m]) for m in members
-}
-
-# --- Add Entropy Hi Row ---
-df_pennies_flow.loc["Entropy Hi"] = {
-    m: round(calculate_entropy(st_output[m]), 3) for m in members
-}
-        results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
-        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
-
-        # --- Tables Display ---
+        # --- Display Section ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
-        st.subheader("🎲 Pennies Movement (Actual Output per Member)")
-        st.dataframe(df_pennies_flow, use_container_width=True)
 
-
-        # --- NEW TABLE: Day-wise Pennies Movement ---
-        st.subheader("🪙 Day-wise Pennies Movement (Actual Flow)")
-        df_pennies = pd.DataFrame(pennies_movement)
-        df_pennies.index = range(1, num_days + 1)
+        # --- NEW TABLE: PENNY MOVEMENT ---
+        st.subheader("💸 Day-wise Movement (Pennies/Units)")
+        df_movement = pd.DataFrame(movement_history).set_index("Day")
         
-        # Calculate summary rows
-        total_fg_row = {m: sum(pennies_movement[m]) for m in members}
-        entropy_row = {m: round(calculate_entropy(pennies_movement[m]), 3) for m in members}
+        # Calculate Footer Rows
+        total_row = df_movement.sum().to_frame(name="Total FG").T
+        entropy_row = pd.Series({m: round(calculate_entropy(st_output[m]), 3) for m in members}, name="Entropy Hi").to_frame().T
         
-        # Combine data for display
-        df_pennies_display = df_pennies.astype(float)
-        df_pennies_display.loc['Total FG'] = total_fg_row
-        df_pennies_display.loc['Entropy Hi'] = entropy_row
-        
-        st.dataframe(df_pennies_display, use_container_width=True)
+        # Combine for display
+        df_movement_display = pd.concat([df_movement.astype(str), total_row.astype(str), entropy_row.astype(str)])
+        st.dataframe(df_movement_display, use_container_width=True)
+        # --------------------------------
 
         st.subheader("📦 Work-In-Progress (WIP) History")
+        results_df = pd.DataFrame(history).set_index("Day")
+        results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
+        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         st.dataframe(results_df, use_container_width=True)
 
         scen_id = len(user_record["history"]) + 1
@@ -364,4 +343,3 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
-
