@@ -210,6 +210,7 @@ with tab1:
             "Total Finished Goods": int(total_fg),
             "Throughput Rate (TR)": round(avg_throughput_rate, 2),
             "Total WIP (W)": sum_total_wip,
+            "Avg WIP (W_avg)": round(avg_total_wip_per_day, 2),
             "Lead Time (L = Avg WIP / TR)": calculated_lead_time,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
@@ -339,4 +340,5 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
