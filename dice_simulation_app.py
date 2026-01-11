@@ -157,12 +157,42 @@ with tab1:
             })
 
         results_df = pd.DataFrame(history).set_index("Day")
+        # =========================================================
+# 🎲 Pennies Movement Table (Per Member – Actual Flow)
+# =========================================================
+pennies_flow = []
+
+for day in df_dice.index:
+    row = {"Day": day}
+    for i, m in enumerate(members):
+        if i == 0:
+            # Member A → Dice Roll (Capacity)
+            row[m] = df_dice.loc[day, m]
+        else:
+            # Member B onwards → Actual pennies received
+            row[m] = st_output[m][day - 1]
+    pennies_flow.append(row)
+
+df_pennies_flow = pd.DataFrame(pennies_flow).set_index("Day")
+
+# --- Add Total FG Row ---
+df_pennies_flow.loc["Total FG"] = {
+    m: sum(st_output[m]) for m in members
+}
+
+# --- Add Entropy Hi Row ---
+df_pennies_flow.loc["Entropy Hi"] = {
+    m: round(calculate_entropy(st_output[m]), 3) for m in members
+}
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
 
         # --- Tables Display ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
+        st.subheader("🎲 Pennies Movement (Actual Output per Member)")
+        st.dataframe(df_pennies_flow, use_container_width=True)
+
 
         # --- NEW TABLE: Day-wise Pennies Movement ---
         st.subheader("🪙 Day-wise Pennies Movement (Actual Flow)")
@@ -334,3 +364,4 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
