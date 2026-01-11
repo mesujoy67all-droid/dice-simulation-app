@@ -120,44 +120,44 @@ with tab1:
         # 2. Simulation Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
-        movement_history = [] # NEW: To track actual penny movement
+        movement_records = [] # New list for the Pennies Movement table
         total_fg = 0
         st_output = defaultdict(list)
         st_wip_trend = defaultdict(list)
 
         for day in df_dice.index:
             day_rolls = df_dice.loc[day]
-            daily_movements = {"Day": day} # Track movements for this specific day
+            daily_movements = {"Day": day}
             daily_fg_out = 0
             
             for i, m in enumerate(members):
                 roll = day_rolls[m]
                 if i == 0:
-                    # Station A always moves its full dice roll (source)
+                    # Station A movement logic
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     wip_buffers[nxt] += roll
                     st_output[m].append(roll)
-                    daily_movements[m] = roll
+                    daily_movements[m] = roll # Movement for Table
                 elif i == len(members) - 1:
-                    # Last Station
+                    # Last Station movement logic
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     daily_fg_out = move
                     total_fg += move
                     st_output[m].append(move)
-                    daily_movements[m] = move
+                    daily_movements[m] = move # Movement for Table
                 else:
-                    # Middle Stations
+                    # Middle Stations movement logic
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     wip_buffers[nxt] += move
                     st_output[m].append(move)
-                    daily_movements[m] = move
+                    daily_movements[m] = move # Movement for Table
 
-            movement_history.append(daily_movements)
+            movement_records.append(daily_movements)
 
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
@@ -169,35 +169,63 @@ with tab1:
                 "Day Wise Total FG": daily_fg_out
             })
 
-        # --- Display Section ---
+        # --- DISPLAY SECTION ---
+        
+        # 1. Dice Table
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
-        # --- NEW TABLE: PENNY MOVEMENT ---
-        st.subheader("💸 Day-wise Movement (Pennies/Units)")
-        df_movement = pd.DataFrame(movement_history).set_index("Day")
+        # 2. NEW: Pennies Movement Table
+        st.subheader("💸 Day-wise Pennies Movement")
+        df_move = pd.DataFrame(movement_records).set_index("Day")
         
-        # Calculate Footer Rows
-        total_row = df_movement.sum().to_frame(name="Total FG").T
-        entropy_row = pd.Series({m: round(calculate_entropy(st_output[m]), 3) for m in members}, name="Entropy Hi").to_frame().T
+        # Calculate summary rows
+        total_fg_row = {m: int(sum(st_output[m])) for m in members}
+        entropy_row = {m: round(calculate_entropy(st_output[m]), 3) for m in members}
         
-        # Combine for display
-        df_movement_display = pd.concat([df_movement.astype(str), total_row.astype(str), entropy_row.astype(str)])
+        # Create summary dataframe
+        df_summary = pd.DataFrame([total_fg_row, entropy_row], index=["Total FG", "Entropy Hi"])
+        
+        # Concatenate for final display
+        df_movement_display = pd.concat([df_move.astype(object), df_summary])
         st.dataframe(df_movement_display, use_container_width=True)
-        # --------------------------------
 
+        # 3. WIP History Table
         st.subheader("📦 Work-In-Progress (WIP) History")
         results_df = pd.DataFrame(history).set_index("Day")
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         st.dataframe(results_df, use_container_width=True)
 
+        # 4. Metrics & Logging (Unchanged to keep Table A values consistent)
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Finished Goods", int(total_fg))
-        c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
+        c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 4)) # Adjusted to 4 decimals for precision
 
+        st.subheader("📈 Performance Trends")
+        st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
+
+        # Logging logic (keeps Table A exactly as you want)
+        scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
+        wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in wip_buffers.items()])
+        dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
+        
+        avg_throughput_rate = total_fg / num_days
+        avg_total_wip_per_day = sum_total_wip / num_days
+        calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 4) if avg_throughput_rate > 0 else 0
+
+        user_record["history"].append({
+            "Scenarios": scen_label,
+            "Days, Initial WIP & Dice Range": f"Days={num_days} | {wip_summary} | {dice_info}",
+            "Total Finished Goods": int(total_fg),
+            "Throughput Rate (TR)": round(avg_throughput_rate, 4),
+            "Total WIP (W)": sum_total_wip,
+            "Lead Time (L = Avg WIP / TR)": calculated_lead_time,
+            "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 4),
+            "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 4)
+        })
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
@@ -343,3 +371,4 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
