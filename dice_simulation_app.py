@@ -55,35 +55,24 @@ user_record = st.session_state.user_db[current_user]
 # --- Sidebar: User Controls & Settings ---
 st.sidebar.header(f"👤 Active: {current_user}")
 
-# --- 1. Simulation Settings (Reordered) ---
 st.sidebar.header("Simulation Settings")
-
-# A. Dice Range for Each Member
-members_list = [chr(64 + i) for i in range(1, 9)] # Pre-defining for the UI
+members_list = [chr(64 + i) for i in range(1, 9)] 
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members_list}
 
-# B. Initial WIP
 wip_keys_list = [f"WIP_{members_list[i]}{members_list[i+1]}" for i in range(len(members_list) - 1)]
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys_list}
 
-# C. Days
 num_days = st.sidebar.number_input("Days", min_value=1, value=1000)
-
-# D. Workstations
 num_members = st.sidebar.number_input("Workstations", min_value=2, value=8, max_value=8)
 
-# Finalizing members based on num_members selection
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
 if st.sidebar.button("▶ Run & Save Simulation"):
-    # Trigger logic is handled inside the tab to maintain UI structure
     st.session_state.trigger_sim = True
 else:
     st.session_state.trigger_sim = False
 
-# --- Bottom Sidebar Items (Logout and Clear History) ---
-# This creates a large gap to push items to the bottom
 for _ in range(10):
     st.sidebar.write("")
 
@@ -110,7 +99,7 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Perf
 with tab1:
     st.title("🚀 Live Operations Console")
     
-    if st.session_state.trigger_sim:
+    if st.session_state.get('trigger_sim', False):
         # 1. Capacity Generation
         dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
         df_dice = pd.DataFrame(dice_rolls)
@@ -120,19 +109,23 @@ with tab1:
         # 2. Simulation Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
+        transfer_history = [] # NEW: To track actual movement for the new table
         total_fg = 0
         st_output = defaultdict(list)
         st_wip_trend = defaultdict(list)
 
         for day in df_dice.index:
             day_rolls = df_dice.loc[day]
+            daily_transfers = {"Day": day}
             daily_fg_out = 0
+            
             for i, m in enumerate(members):
                 roll = day_rolls[m]
                 if i == 0:
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     wip_buffers[nxt] += roll
                     st_output[m].append(roll)
+                    daily_transfers[m] = roll
                 elif i == len(members) - 1:
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     move = min(roll, wip_buffers[prv])
@@ -140,6 +133,7 @@ with tab1:
                     daily_fg_out = move
                     total_fg += move
                     st_output[m].append(move)
+                    daily_transfers[m] = move
                 else:
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     nxt = f"WIP_{members[i]}{members[i+1]}"
@@ -147,6 +141,9 @@ with tab1:
                     wip_buffers[prv] -= move
                     wip_buffers[nxt] += move
                     st_output[m].append(move)
+                    daily_transfers[m] = move
+
+            transfer_history.append(daily_transfers)
 
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
@@ -158,12 +155,30 @@ with tab1:
                 "Day Wise Total FG": daily_fg_out
             })
 
+        # --- Table Preparations ---
         results_df = pd.DataFrame(history).set_index("Day")
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
 
+        # Logic for New Transfer Table
+        df_transfers = pd.DataFrame(transfer_history).set_index("Day")
+        total_fg_row = {m: int(sum(st_output[m])) for m in members}
+        entropy_row = {m: round(calculate_entropy(st_output[m]), 3) for m in members}
+        
+        footer_df = pd.DataFrame([
+            {"Day": "Total FG", **total_fg_row},
+            {"Day": "Entropy Hi", **entropy_row}
+        ]).set_index("Day")
+        
+        transfer_perf_table = pd.concat([df_transfers.astype(object), footer_df])
+
+        # --- UI Rendering ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
+
+        # NEW TABLE ADDED HERE
+        st.subheader("🪙 Daily Pennies Transferred & Performance")
+        st.dataframe(transfer_perf_table, use_container_width=True)
 
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(results_df, use_container_width=True)
@@ -173,6 +188,7 @@ with tab1:
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Finished Goods", int(total_fg))
         c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
+        c3.metric("Total WIP (W)", sum_total_wip)
 
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
@@ -269,7 +285,6 @@ with tab2:
     else:
         st.info("No recorded history found for this User ID.")
 
-# --- PAGE 3: METHODOLOGY ---
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
     st.markdown("""
