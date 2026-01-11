@@ -55,7 +55,9 @@ user_record = st.session_state.user_db[current_user]
 # --- Sidebar: User Controls & Settings ---
 st.sidebar.header(f"👤 Active: {current_user}")
 
+# --- 1. Simulation Settings ---
 st.sidebar.header("Simulation Settings")
+
 members_list = [chr(64 + i) for i in range(1, 9)] 
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members_list}
 
@@ -99,7 +101,7 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Perf
 with tab1:
     st.title("🚀 Live Operations Console")
     
-    if st.session_state.get('trigger_sim', False):
+    if st.session_state.trigger_sim:
         # 1. Capacity Generation
         dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
         df_dice = pd.DataFrame(dice_rolls)
@@ -109,41 +111,40 @@ with tab1:
         # 2. Simulation Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
-        transfer_history = [] # NEW: To track actual movement for the new table
         total_fg = 0
         st_output = defaultdict(list)
         st_wip_trend = defaultdict(list)
+        
+        # Tracking actual flow for the new table
+        actual_moves = defaultdict(list)
 
         for day in df_dice.index:
             day_rolls = df_dice.loc[day]
-            daily_transfers = {"Day": day}
             daily_fg_out = 0
-            
             for i, m in enumerate(members):
                 roll = day_rolls[m]
                 if i == 0:
+                    # Logic for Member A: Always moves full dice roll (source)
                     nxt = f"WIP_{members[i]}{members[i+1]}"
-                    wip_buffers[nxt] += roll
-                    st_output[m].append(roll)
-                    daily_transfers[m] = roll
+                    move = roll
+                    wip_buffers[nxt] += move
                 elif i == len(members) - 1:
+                    # Logic for Last Member: Constrained by previous WIP
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     daily_fg_out = move
                     total_fg += move
-                    st_output[m].append(move)
-                    daily_transfers[m] = move
                 else:
+                    # Logic for Intermediate Members: Constrained by previous WIP
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     wip_buffers[nxt] += move
-                    st_output[m].append(move)
-                    daily_transfers[m] = move
-
-            transfer_history.append(daily_transfers)
+                
+                st_output[m].append(move)
+                actual_moves[m].append(move)
 
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
@@ -155,40 +156,40 @@ with tab1:
                 "Day Wise Total FG": daily_fg_out
             })
 
-        # --- Table Preparations ---
         results_df = pd.DataFrame(history).set_index("Day")
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
 
-        # Logic for New Transfer Table
-        df_transfers = pd.DataFrame(transfer_history).set_index("Day")
-        total_fg_row = {m: int(sum(st_output[m])) for m in members}
-        entropy_row = {m: round(calculate_entropy(st_output[m]), 3) for m in members}
-        
-        footer_df = pd.DataFrame([
-            {"Day": "Total FG", **total_fg_row},
-            {"Day": "Entropy Hi", **entropy_row}
-        ]).set_index("Day")
-        
-        transfer_perf_table = pd.concat([df_transfers.astype(object), footer_df])
-
-        # --- UI Rendering ---
+        # --- TABLES DISPLAY ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
-        # NEW TABLE ADDED HERE
-        st.subheader("🪙 Daily Pennies Transferred & Performance")
-        st.dataframe(transfer_perf_table, use_container_width=True)
+        # NEW TABLE: Actual Pennies Transferred
+        st.subheader("🔄 Table of Actual Pennies Transferred")
+        df_actual_transferred = pd.DataFrame(actual_moves)
+        df_actual_transferred.index = range(1, num_days + 1)
+        df_actual_transferred.index.name = "Day"
+
+        # Calculate summary rows
+        total_fg_row = {m: int(sum(st_output[m])) for m in members}
+        entropy_hi_row = {m: round(calculate_entropy(st_output[m]), 3) for m in members}
+
+        # Convert to float to allow row appending and formatting
+        df_display_actual = df_actual_transferred.astype(float)
+        df_display_actual.loc['Total FG'] = total_fg_row
+        df_display_actual.loc['Entropy Hi'] = entropy_hi_row
+        
+        st.dataframe(df_display_actual, use_container_width=True)
 
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(results_df, use_container_width=True)
 
+        # --- Performance Summary Metrics ---
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Finished Goods", int(total_fg))
         c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
-        c3.metric("Total WIP (W)", sum_total_wip)
 
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
@@ -285,6 +286,7 @@ with tab2:
     else:
         st.info("No recorded history found for this User ID.")
 
+# --- PAGE 3: METHODOLOGY ---
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
     st.markdown("""
@@ -294,7 +296,10 @@ with tab3:
     st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
     st.markdown("### System Architecture")
     st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
+    
+    # Adding diagram for visual clarity on station flow
     st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
+    
 
     st.info("""
     **The Student's Guide to Movement Logic:**
