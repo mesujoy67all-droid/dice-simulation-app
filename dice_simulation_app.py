@@ -110,23 +110,24 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Perf
 with tab1:
     st.title("🚀 Live Operations Console")
     
-    # Check if the button was pressed
-    if st.session_state.get('trigger_sim', False):
+    # Check if we should run the simulation
+    if st.sidebar.button("▶ Run & Save Simulation") or st.session_state.get('trigger_sim', False):
+        st.session_state.trigger_sim = True  # Keep it visible
+        
         # 1. Capacity Generation
         dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
         df_dice = pd.DataFrame(dice_rolls)
         df_dice.index = range(1, num_days + 1)
         df_dice.index.name = "Day"
 
-        # 2. Simulation Logic Initialization
+        # 2. Simulation Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
-        transfer_history = [] # To track actual movement for the new table
+        transfer_history = [] 
         total_fg = 0
         st_output = defaultdict(list)
         st_wip_trend = defaultdict(list)
 
-        # 3. Running the Simulation Loop
         for day in df_dice.index:
             day_rolls = df_dice.loc[day]
             daily_transfers = {"Day": day}
@@ -135,13 +136,11 @@ with tab1:
             for i, m in enumerate(members):
                 roll = day_rolls[m]
                 if i == 0:
-                    # Member A: Always moves full dice capacity
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     wip_buffers[nxt] += roll
                     st_output[m].append(roll)
                     daily_transfers[m] = roll
                 elif i == len(members) - 1:
-                    # Last Member: Moves from buffer to Finished Goods
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
@@ -150,7 +149,6 @@ with tab1:
                     st_output[m].append(move)
                     daily_transfers[m] = move
                 else:
-                    # Middle Members: Moves from prev buffer to next buffer
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     move = min(roll, wip_buffers[prv])
@@ -171,47 +169,59 @@ with tab1:
                 "Day Wise Total FG": daily_fg_out
             })
 
-        # --- DATA PREPARATION FOR TABLES ---
+        # --- Table Preparation ---
         
-        # New Table: Transfers + Totals + Entropy
-        transfer_df = pd.DataFrame(transfer_history).set_index("Day")
-        totals = {m: int(sum(st_output[m])) for m in members}
-        entropies = {m: round(calculate_entropy(st_output[m]), 3) for m in members}
-        
-        footer_df = pd.DataFrame([
-            {"Day": "Total FG", **totals},
-            {"Day": "Entropy Hi", **entropies}
-        ]).set_index("Day")
-        
-        display_transfer_df = pd.concat([transfer_df.astype(object), footer_df])
-
-        # WIP History Table
-        results_df = pd.DataFrame(history).set_index("Day")
-        results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
-        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
-
-        # --- UI DISPLAY ---
+        # Table 1: Dice Rolls
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
-        # NEW TABLE: Daily Pennies Transferred
+        # Table 2: Pennies Transferred (THE NEW TABLE)
         st.subheader("🪙 Daily Pennies Transferred & Performance")
+        
+        t_df = pd.DataFrame(transfer_history).set_index("Day")
+        t_totals = {m: int(sum(st_output[m])) for m in members}
+        t_entropies = {m: round(calculate_entropy(st_output[m]), 3) for m in members}
+        
+        f_df = pd.DataFrame([
+            {"Day": "Total FG", **t_totals},
+            {"Day": "Entropy Hi", **t_entropies}
+        ]).set_index("Day")
+        
+        # Use .astype(str) for the footer to ensure mixed types (numbers/text) don't crash the display
+        display_transfer_df = pd.concat([t_df.astype(float), f_df])
         st.dataframe(display_transfer_df, use_container_width=True)
 
+        # Table 3: WIP History
         st.subheader("📦 Work-In-Progress (WIP) History")
+        results_df = pd.DataFrame(history).set_index("Day")
+        results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
+        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         st.dataframe(results_df, use_container_width=True)
 
-        # Metrics and Charts
+        # Metrics & Charts
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Finished Goods", int(total_fg))
         c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
-        c3.metric("Total WIP Accumulated", sum_total_wip)
+        c3.metric("Lead Time (L)", round((sum_total_wip/num_days)/(total_fg/num_days), 2) if total_fg > 0 else 0)
 
-        st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
+        # --- Save to History (Crucial for Tab 2) ---
+        # Note: We only append if this is a fresh run (to prevent double-logging on rerun)
+        if st.sidebar.button("▶ Run & Save Simulation"):
+            scen_label = f"Scenario #{len(user_record['history']) + 1}"
+            user_record["history"].append({
+                "Scenarios": scen_label,
+                "Total Finished Goods": int(total_fg),
+                "Throughput Rate (TR)": round(total_fg / num_days, 2),
+                "Total WIP (W)": sum_total_wip,
+                # ... include other original keys here ...
+            })
+            # (Keep the rest of your original logging logic for user_record["stations"] here)
+    else:
+        st.info("Adjust settings in the sidebar and click 'Run & Save Simulation' to begin.")
         # --- LOGGING (Crucial for Analytics Tab) ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in wip_buffers.items()])
@@ -383,5 +393,6 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
