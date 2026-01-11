@@ -179,25 +179,36 @@ with tab1:
         # --- NEW SECTION: Member-Level Performance ---
         st.subheader("👤 Member-Level Production & Entropy")
         
-        # Calculate individual metrics
-        member_stats = []
+        # 1. Create the data structure
+        member_metrics = {
+            "Metric": ["Total FG Processed", "Entropy (Chaos Score)", "Avg Daily Output"]
+        }
+        
         for m in members:
             output_data = st_output[m]
-            member_stats.append({
-                "Member/Station": m,
-                "Total Items Processed (FG)": sum(output_data),
-                "Entropy (Chaos Score)": round(calculate_entropy(output_data), 3),
-                "Avg Daily Output": round(np.mean(output_data), 2)
-            })
+            member_metrics[m] = [
+                int(sum(output_data)), 
+                round(calculate_entropy(output_data), 3),
+                round(np.mean(output_data), 2)
+            ]
         
-        df_member_stats = pd.DataFrame(member_stats).set_index("Member/Station")
+        # 2. Create DataFrame and set Metric as index
+        df_member_transposed = pd.DataFrame(member_metrics).set_index("Metric")
         
-        # Display as a highlighted table
-        st.table(df_member_stats)
-        
-        # Adding a visual guide for the Entropy
-        st.caption("💡 *Note: Higher Entropy indicates more volatility in that member's daily output due to upstream starvation or downstream blocking.*")
+        # 3. Display the Table
+        st.table(df_member_transposed)
 
+        # 4. Add Download Button for this specific table
+        csv_member_data = df_member_transposed.to_csv().encode('utf-8')
+        st.download_button(
+            label="📥 Download Member Stats (CSV)",
+            data=csv_member_data,
+            file_name=f"member_stats_scenario_{scen_id}.csv",
+            mime="text/csv",
+        )
+        
+        st.caption("💡 *Rows show metrics, Columns show the flow from Station A through the chain.*")
+        
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
@@ -358,6 +369,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
