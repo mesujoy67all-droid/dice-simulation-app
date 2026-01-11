@@ -123,30 +123,43 @@ with tab1:
         total_fg = 0
         st_output = defaultdict(list)
         st_wip_trend = defaultdict(list)
+        
+        # Track actual pennies transferred per station for the new table
+        transfer_history = []
 
         for day in df_dice.index:
             day_rolls = df_dice.loc[day]
+            daily_transfers = {"Day": day}
             daily_fg_out = 0
+            
             for i, m in enumerate(members):
                 roll = day_rolls[m]
                 if i == 0:
+                    # Member A: Transfers full dice roll
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     wip_buffers[nxt] += roll
                     st_output[m].append(roll)
+                    daily_transfers[m] = roll
                 elif i == len(members) - 1:
+                    # Last Member: Transfers to Finished Goods
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     daily_fg_out = move
                     total_fg += move
                     st_output[m].append(move)
+                    daily_transfers[m] = move
                 else:
+                    # Intermediate Members: Transfer from prev buffer to next buffer
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     wip_buffers[nxt] += move
                     st_output[m].append(move)
+                    daily_transfers[m] = move
+
+            transfer_history.append(daily_transfers)
 
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
@@ -158,16 +171,38 @@ with tab1:
                 "Day Wise Total FG": daily_fg_out
             })
 
-        results_df = pd.DataFrame(history).set_index("Day")
-        results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
-        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
+        # --- Data Processing for New Table ---
+        transfer_df = pd.DataFrame(transfer_history).set_index("Day")
+        
+        # Calculate totals and entropy for the footer rows
+        totals = {m: int(sum(st_output[m])) for m in members}
+        entropies = {m: round(calculate_entropy(st_output[m]), 3) for m in members}
+        
+        # Create the footer rows as a separate dataframe to append
+        footer_data = [
+            {"Day": "Total FG", **totals},
+            {"Day": "Entropy Hi", **entropies}
+        ]
+        footer_df = pd.DataFrame(footer_data).set_index("Day")
+        
+        # Combine transfer data with footer
+        display_transfer_df = pd.concat([transfer_df.astype(object), footer_df])
 
+        # --- UI Rendering ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
+        # NEW TABLE ADDED HERE
+        st.subheader("🪙 Daily Pennies Transferred & Station Performance")
+        st.dataframe(display_transfer_df, use_container_width=True)
+
         st.subheader("📦 Work-In-Progress (WIP) History")
+        results_df = pd.DataFrame(history).set_index("Day")
+        results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
+        sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         st.dataframe(results_df, use_container_width=True)
 
+        # ... (Rest of your original metric cards and charts follow)
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
@@ -319,3 +354,4 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
