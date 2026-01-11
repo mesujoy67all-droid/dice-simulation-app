@@ -175,6 +175,28 @@ with tab1:
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         st.dataframe(results_df, use_container_width=True)
+        
+        # --- NEW SECTION: Member-Level Performance ---
+        st.subheader("👤 Member-Level Production & Entropy")
+        
+        # Calculate individual metrics
+        member_stats = []
+        for m in members:
+            output_data = st_output[m]
+            member_stats.append({
+                "Member/Station": m,
+                "Total Items Processed (FG)": sum(output_data),
+                "Entropy (Chaos Score)": round(calculate_entropy(output_data), 3),
+                "Avg Daily Output": round(np.mean(output_data), 2)
+            })
+        
+        df_member_stats = pd.DataFrame(member_stats).set_index("Member/Station")
+        
+        # Display as a highlighted table
+        st.table(df_member_stats)
+        
+        # Adding a visual guide for the Entropy
+        st.caption("💡 *Note: Higher Entropy indicates more volatility in that member's daily output due to upstream starvation or downstream blocking.*")
 
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
@@ -336,5 +358,6 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
