@@ -58,7 +58,7 @@ st.sidebar.header(f"👤 Active: {current_user}")
 # --- 1. Simulation Settings ---
 st.sidebar.header("Simulation Settings")
 
-members_list = [chr(64 + i) for i in range(1, 9)] 
+members_list = [chr(64 + i) for i in range(1, 9)]
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members_list}
 
 wip_keys_list = [f"WIP_{members_list[i]}{members_list[i+1]}" for i in range(len(members_list) - 1)]
@@ -115,8 +115,8 @@ with tab1:
         st_output = defaultdict(list)
         st_wip_trend = defaultdict(list)
         
-        # Tracking actual flow for the new table
-        actual_moves = defaultdict(list)
+        # New: Track actual movement for the Pennies Table
+        pennies_movement = defaultdict(list)
 
         for day in df_dice.index:
             day_rolls = df_dice.loc[day]
@@ -124,27 +124,27 @@ with tab1:
             for i, m in enumerate(members):
                 roll = day_rolls[m]
                 if i == 0:
-                    # Logic for Member A: Always moves full dice roll (source)
+                    # Member A always moves full dice roll (Source)
                     nxt = f"WIP_{members[i]}{members[i+1]}"
-                    move = roll
-                    wip_buffers[nxt] += move
+                    wip_buffers[nxt] += roll
+                    st_output[m].append(roll)
+                    pennies_movement[m].append(roll)
                 elif i == len(members) - 1:
-                    # Logic for Last Member: Constrained by previous WIP
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     daily_fg_out = move
                     total_fg += move
+                    st_output[m].append(move)
+                    pennies_movement[m].append(move)
                 else:
-                    # Logic for Intermediate Members: Constrained by previous WIP
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     move = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move
                     wip_buffers[nxt] += move
-                
-                st_output[m].append(move)
-                actual_moves[m].append(move)
+                    st_output[m].append(move)
+                    pennies_movement[m].append(move)
 
             for k, v in wip_buffers.items():
                 st_wip_trend[k.replace("WIP_", "")].append(v)
@@ -160,31 +160,29 @@ with tab1:
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
 
-        # --- TABLES DISPLAY ---
+        # --- Tables Display ---
         st.subheader("🎲 Table of Dice Rolls (Capacity)")
         st.dataframe(df_dice, use_container_width=True)
 
-        # NEW TABLE: Actual Pennies Transferred
-        st.subheader("🔄 Table of Actual Pennies Transferred")
-        df_actual_transferred = pd.DataFrame(actual_moves)
-        df_actual_transferred.index = range(1, num_days + 1)
-        df_actual_transferred.index.name = "Day"
-
-        # Calculate summary rows
-        total_fg_row = {m: int(sum(st_output[m])) for m in members}
-        entropy_hi_row = {m: round(calculate_entropy(st_output[m]), 3) for m in members}
-
-        # Convert to float to allow row appending and formatting
-        df_display_actual = df_actual_transferred.astype(float)
-        df_display_actual.loc['Total FG'] = total_fg_row
-        df_display_actual.loc['Entropy Hi'] = entropy_hi_row
+        # --- NEW TABLE: Day-wise Pennies Movement ---
+        st.subheader("🪙 Day-wise Pennies Movement (Actual Flow)")
+        df_pennies = pd.DataFrame(pennies_movement)
+        df_pennies.index = range(1, num_days + 1)
         
-        st.dataframe(df_display_actual, use_container_width=True)
+        # Calculate summary rows
+        total_fg_row = {m: sum(pennies_movement[m]) for m in members}
+        entropy_row = {m: round(calculate_entropy(pennies_movement[m]), 3) for m in members}
+        
+        # Combine data for display
+        df_pennies_display = df_pennies.astype(float)
+        df_pennies_display.loc['Total FG'] = total_fg_row
+        df_pennies_display.loc['Entropy Hi'] = entropy_row
+        
+        st.dataframe(df_pennies_display, use_container_width=True)
 
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(results_df, use_container_width=True)
 
-        # --- Performance Summary Metrics ---
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
         c1, c2, c3 = st.columns(3)
@@ -296,10 +294,7 @@ with tab3:
     st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
     st.markdown("### System Architecture")
     st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
-    
-    # Adding diagram for visual clarity on station flow
     st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
-    
 
     st.info("""
     **The Student's Guide to Movement Logic:**
