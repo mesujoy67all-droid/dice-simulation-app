@@ -186,17 +186,26 @@ with tab1:
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
         # --- Logging Logic ---
+# --- Logging Logic (Place inside the trigger_sim IF block) ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
-        wip_summary = ", ".join([f"{k.replace('WIP_', '')}={v}" for k, v in wip_buffers.items()])
+        
+        # 1. Capture exact WIP levels used for this specific run
+        wip_summary = ", ".join([f"{k.replace('WIP_', '')}={initial_wip[k]}" for k in wip_keys])
+        
+        # 2. Capture exact Dice Configs used for this specific run
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         
+        # 3. Combine into the descriptive string
+        run_description = f"Days={num_days} | WIP: {wip_summary} | Dice: {dice_info}"
+
         avg_throughput_rate = total_fg / num_days
         avg_total_wip_per_day = sum_total_wip / num_days
         calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
 
+        # Save to history using the dynamic run_description
         user_record["history"].append({
             "Scenarios": scen_label,
-            "Days, Initial WIP & Dice Range": f"Days={num_days} | {wip_summary} | {dice_info}",
+            "Days, Initial WIP & Dice Range": run_description,
             "Total Finished Goods": int(total_fg),
             "Throughput Rate (TR)": round(avg_throughput_rate, 2),
             "Total WIP (W)": sum_total_wip,
@@ -327,4 +336,5 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
