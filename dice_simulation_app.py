@@ -175,9 +175,26 @@ with tab1:
         results_df = pd.DataFrame(history).set_index("Day")
         results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
         st.dataframe(results_df, use_container_width=True)
+        # --- Tab 1 DISPLAY RESULTS ---
+        scen_id = len(user_record["history"]) + 1
+        st.subheader(f"🏁 Scenario #{scen_id} Live Results")
+        
+        final_wip_inventory = sum(wip_buffers.values())
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Finished Goods", int(total_fg))
+        c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
+        c3.metric("Ending WIP Inventory", int(final_wip_inventory))
+
+        st.subheader("📈 Performance Trends")
+        results_df = pd.DataFrame(history).set_index("Day")
+        results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
+        st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
         # --- LOGGING DATA ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
+        wip_summary = ", ".join([f"{k.replace('WIP_', '')}={initial_wip[k]}" for k in wip_keys])
+        dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
+        run_description = f"Days={num_days} | WIP: {wip_summary} | Dice: {dice_info}"
         
         # Table A Log
         avg_throughput_rate = total_fg / num_days
@@ -245,6 +262,18 @@ with tab2:
                     row[buffer] = round(val[0] * mult, 2) if len(val) > 0 else 0.00
                 rows_c.append(row)
         st.table(pd.DataFrame(rows_c).set_index(["Scenario", "Time Metric"]))
+        # Export Section
+        st.markdown("---")
+        st.subheader("📥 Export Analytics")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_table_a.to_excel(writer, sheet_name='Summary History')
+            df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
+        
+        excel_data = output.getvalue()
+        st.download_button(label="Download Full Analytics Excel", data=excel_data, file_name=f"Simulation_Data_{current_user}.xlsx")
+    else:
+        st.info("No recorded history found. Run a simulation in the Live Operations Console first.")
 
 # --- PAGE 3: METHODOLOGY ---
 
@@ -298,6 +327,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
