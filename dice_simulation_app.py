@@ -225,15 +225,22 @@ with tab1:
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 2)
         })
 
+        # --- Updated Logging Logic for Table B ---
         for m in members:
-            pair = next((k.replace("WIP_", "") for k in wip_keys if k.endswith(m)), m)
-            if pair == "A": continue
-                
+            # We determine the "Station Name" (e.g., Station A, Station B)
+            station_label = f"Station {m}"
+            
+            # Calculate metrics for this specific member
             h_val = calculate_entropy(st_output[m])
+            tot_out = sum(st_output[m])
+            d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
+            
             user_record["stations"].append({
-                "Scenario": scen_label, "Station": f"Station {pair}", "Dice Range": f"{dice_configs[m][0]}-{dice_configs[m][1]}",
-                "Tot Output": sum(st_output[m]), "Avg WIP": round(np.mean(st_wip_trend[pair]), 2) if pair in st_wip_trend else 0,
-                "Entropy Hi": round(h_val, 3), "Interpretation": "Variable" if h_val > 2.4 else "Stable"
+                "Scenario": scen_label, 
+                "Station": station_label, 
+                "Dice Range": d_range,
+                "Tot Output": tot_out, 
+                "Entropy Hi": round(h_val, 3)
             })
 
 with tab2:
@@ -256,8 +263,27 @@ with tab2:
         st.subheader("Table A: Summary History")
         st.table(df_table_a)
         
-        st.markdown("---")
-        st.subheader("Table B: Station-Level Flow Diagnostics (Buffers Only)")
+st.markdown("---")
+        st.subheader("Table B: Station-Level Flow Diagnostics")
+        
+        # Define the specific metrics you requested
+        metrics_to_show = ["Dice Range", "Tot Output", "Entropy Hi"]
+        
+        rows_b = []
+        for scen in s_df['Scenario'].unique():
+            for i, metric in enumerate(metrics_to_show):
+                # We want the Scenario name to appear only on the first row of each scenario block
+                row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
+                
+                for s_label in s_df['Station'].unique():
+                    subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
+                    if not subset.empty:
+                        row_data[s_label] = subset[metric].values[0]
+                    else:
+                        row_data[s_label] = "N/A"
+                rows_b.append(row_data)
+        
+        df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
         st.table(df_table_b)
 
         st.markdown("---")
@@ -349,5 +375,6 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
