@@ -263,16 +263,17 @@ with tab2:
         st.subheader("Table A: Summary History")
         st.table(df_table_a)
         
-st.markdown("---")
+        st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
         
-        # Define the specific metrics you requested
+        # 1. Define the specific metrics for the stations
         metrics_to_show = ["Dice Range", "Tot Output", "Entropy Hi"]
         
         rows_b = []
+        # 2. Loop through each scenario and metric to build the pivot table
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics_to_show):
-                # We want the Scenario name to appear only on the first row of each scenario block
+                # First row of a scenario shows the name; others are blank for a clean look
                 row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
                 
                 for s_label in s_df['Station'].unique():
@@ -283,8 +284,10 @@ st.markdown("---")
                         row_data[s_label] = "N/A"
                 rows_b.append(row_data)
         
-        df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
-        st.table(df_table_b)
+        # 3. Create the DataFrame and display it
+        if rows_b:
+            df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
+            st.table(df_table_b)
 
         st.markdown("---")
         st.subheader("Table C: Temporal WIP Averages (Day/Week/Month)")
@@ -375,6 +378,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
