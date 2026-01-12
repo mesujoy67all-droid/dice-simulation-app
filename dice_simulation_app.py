@@ -195,7 +195,7 @@ with tab1:
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
 
-        # --- Logging Logic ---
+       # --- Logging Logic ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={initial_wip[k]}" for k in wip_keys])
         dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
@@ -204,6 +204,7 @@ with tab1:
         avg_throughput_rate = total_fg / num_days
         avg_total_wip_per_day = sum_total_wip / num_days
         calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
+        
         # Capture the final snapshot of inventory
         final_wip_inventory = sum(wip_buffers.values())
 
@@ -212,8 +213,8 @@ with tab1:
             "Days, Initial WIP & Dice Range": run_description,
             "Total Finished Goods": int(total_fg),
             "Throughput Rate (TR)": round(avg_throughput_rate, 2),
-            "WIP at the End of the Simulation": int(final_wip_inventory)
             "Avg WIP (W_avg)": round(avg_total_wip_per_day, 2),
+            "WIP at the End of the Simulation": int(final_wip_inventory),
             "Lead Time (L = Avg WIP / TR)": calculated_lead_time,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
@@ -343,6 +344,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
