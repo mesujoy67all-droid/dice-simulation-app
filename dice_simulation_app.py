@@ -185,8 +185,16 @@ with tab1:
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         st.dataframe(results_df, use_container_width=True)
 
-        scen_id = len(user_record["history"]) + 1
-        st.subheader(f"🏁 Scenario #{scen_id} Results")
+        # 1. Determine the Title for the current run
+        history_count = len(user_record["history"])
+        if history_count == 0:
+            display_title = "🏁 Base Run Results"
+            scen_label = "Base-Run"
+        else:
+            display_title = f"🏁 Scenario #{history_count} Results"
+            scen_label = f"Scenario #{history_count}"
+        
+        st.subheader(display_title)
         
         # Calculate the current final WIP for display
         final_wip_inventory = sum(wip_buffers.values())
@@ -393,3 +401,4 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
