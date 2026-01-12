@@ -227,22 +227,25 @@ with tab1:
 
         # --- Updated Logging Logic for Table B ---
         for m in members:
-            # Create a label for the station (Station A, Station B, etc.)
             station_label = f"Station {m}"
-            
-            # Calculate the specific metrics you want to display
             h_val = calculate_entropy(st_output[m])
             tot_out = sum(st_output[m])
-            # This matches the "Dice Range" metric key exactly
             d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
             
-            # Save the record with the new keys
+            # Use np.mean on the specific WIP trend for this station
+            # Note: Station A has no 'previous' buffer, so we handle that
+            avg_wip_val = 0.0
+            if m != 'A':
+                avg_wip_val = round(np.mean(st_wip_trend[next(k.replace("WIP_", "") for k in wip_keys if k.endswith(m))]), 2)
+
             user_record["stations"].append({
                 "Scenario": scen_label, 
                 "Station": station_label, 
                 "Dice Range": d_range,
                 "Tot Output": tot_out, 
-                "Entropy Hi": round(h_val, 3)
+                "Avg WIP": avg_wip_val,
+                "Entropy Hi": round(h_val, 3),
+                "Interpretation": "Variable" if h_val > 2.4 else "Stable"
             })
 
 with tab2:
@@ -264,22 +267,21 @@ with tab2:
 
         st.subheader("Table A: Summary History")
         st.table(df_table_a)
+        
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
         
-        # These MUST match the keys saved in Tab 1
-        metrics_to_show = ["Dice Range", "Tot Output", "Entropy Hi"]
+        # This list MUST match the keys used in the dictionary in Tab 1
+        metrics_to_show = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
         
         rows_b = []
-        # Group data by Scenario and Metric
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics_to_show):
                 row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
                 
                 for s_label in s_df['Station'].unique():
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
-                    if not subset.empty:
-                        # This line was causing your KeyError if 'metric' wasn't found
+                    if not subset.empty and metric in subset.columns:
                         row_data[s_label] = subset[metric].values[0]
                     else:
                         row_data[s_label] = "N/A"
@@ -288,7 +290,7 @@ with tab2:
         if rows_b:
             df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
             st.table(df_table_b)
-
+            
         st.markdown("---")
         st.subheader("Table C: Temporal WIP Averages (Day/Week/Month)")
 
@@ -378,6 +380,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
