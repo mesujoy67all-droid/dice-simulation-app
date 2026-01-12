@@ -227,14 +227,16 @@ with tab1:
 
         # --- Updated Logging Logic for Table B ---
         for m in members:
-            # We determine the "Station Name" (e.g., Station A, Station B)
+            # Create a label for the station (Station A, Station B, etc.)
             station_label = f"Station {m}"
             
-            # Calculate metrics for this specific member
+            # Calculate the specific metrics you want to display
             h_val = calculate_entropy(st_output[m])
             tot_out = sum(st_output[m])
+            # This matches the "Dice Range" metric key exactly
             d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
             
+            # Save the record with the new keys
             user_record["stations"].append({
                 "Scenario": scen_label, 
                 "Station": station_label, 
@@ -262,29 +264,27 @@ with tab2:
 
         st.subheader("Table A: Summary History")
         st.table(df_table_a)
-        
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
         
-        # 1. Define the specific metrics for the stations
+        # These MUST match the keys saved in Tab 1
         metrics_to_show = ["Dice Range", "Tot Output", "Entropy Hi"]
         
         rows_b = []
-        # 2. Loop through each scenario and metric to build the pivot table
+        # Group data by Scenario and Metric
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics_to_show):
-                # First row of a scenario shows the name; others are blank for a clean look
                 row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
                 
                 for s_label in s_df['Station'].unique():
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
                     if not subset.empty:
+                        # This line was causing your KeyError if 'metric' wasn't found
                         row_data[s_label] = subset[metric].values[0]
                     else:
                         row_data[s_label] = "N/A"
                 rows_b.append(row_data)
         
-        # 3. Create the DataFrame and display it
         if rows_b:
             df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
             st.table(df_table_b)
@@ -378,6 +378,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
