@@ -187,9 +187,15 @@ with tab1:
 
         scen_id = len(user_record["history"]) + 1
         st.subheader(f"🏁 Scenario #{scen_id} Results")
+        
+        # Calculate the current final WIP for display
+        final_wip_inventory = sum(wip_buffers.values())
+
+        # Update the columns to show all three metrics
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Finished Goods", int(total_fg))
         c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
+        c3.metric("Ending WIP Inventory", int(final_wip_inventory)) # <--- Added this
 
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
@@ -343,4 +349,5 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
