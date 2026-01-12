@@ -293,9 +293,13 @@ with tab2:
             
         st.markdown("---")
         st.subheader("Table C: Temporal WIP Averages (By Buffer)")
+        all_recorded_stations = s_df['Station'].unique()
 
-        # Create Buffer Labels (AB, BC, CD...) based on active stations
-        buffer_labels = [f"{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
+        recorded_letters = sorted([s.split(" ")[1] for s in all_recorded_stations])
+        
+        buffer_labels = []
+        for i in range(len(recorded_letters) - 1):
+            buffer_labels.append(f"{recorded_letters[i]}{recorded_letters[i+1]}")
 
         rows_c = []
         for scen in s_df['Scenario'].unique():
@@ -392,6 +396,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
