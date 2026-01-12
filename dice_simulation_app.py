@@ -168,7 +168,7 @@ with tab1:
 
         # Calculate additional rows
         total_output_row = df_pennies.sum().to_frame().T
-        total_output_row.index = ["TOTAL OUTPUT"]
+        total_output_row.index = ["THROUGHPUT"] # <--- Updated Name
         
         entropy_vals = {m: round(calculate_entropy(pennies_movement_data[m]), 3) for m in members}
         entropy_row = pd.DataFrame([entropy_vals])
@@ -181,7 +181,7 @@ with tab1:
         # 3. WIP History
         st.subheader("📦 Work-In-Progress (WIP) History")
         results_df = pd.DataFrame(history).set_index("Day")
-        results_df["Cumulative FG"] = results_df["Day Wise Total FG"].cumsum()
+        results_df["Cumulative Throughput"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         st.dataframe(results_df, use_container_width=True)
 
@@ -193,12 +193,12 @@ with tab1:
 
         # Update the columns to show all three metrics
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total Finished Goods", int(total_fg))
+        c1.metric("Throughput", int(total_fg)) # <--- Updated Name
         c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
-        c3.metric("Ending WIP Inventory", int(final_wip_inventory)) # <--- Added this
+        c3.metric("Ending WIP Inventory", int(final_wip_inventory)) 
 
         st.subheader("📈 Performance Trends")
-        st.line_chart(results_df[["Daily_Total_WIP", "Cumulative FG"]])
+        st.line_chart(results_df[["Daily_Total_WIP", "Cumulative Throughput"]])
 
         # --- Logging Logic ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
@@ -216,10 +216,10 @@ with tab1:
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": run_description,
-            "Total Finished Goods": int(total_fg),
+            "Throughput": int(total_fg), # <--- Updated Name
             "Throughput Rate (TR)": round(avg_throughput_rate, 2),
             "Avg WIP (W_avg)": round(avg_total_wip_per_day, 2),
-            "WIP at the End of the Simulation": int(final_wip_inventory), # <--- NEW COLUMN
+            "WIP at the End of the Simulation": int(final_wip_inventory),
             "Lead Time (L = Avg WIP / TR)": calculated_lead_time,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 2),
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 2)
@@ -233,7 +233,6 @@ with tab1:
             d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
             
             # Use np.mean on the specific WIP trend for this station
-            # Note: Station A has no 'previous' buffer, so we handle that
             avg_wip_val = 0.0
             if m != 'A':
                 avg_wip_val = round(np.mean(st_wip_trend[next(k.replace("WIP_", "") for k in wip_keys if k.endswith(m))]), 2)
@@ -242,7 +241,7 @@ with tab1:
                 "Scenario": scen_label, 
                 "Station": station_label, 
                 "Dice Range": d_range,
-                "Tot Output": tot_out, 
+                "Throughput": tot_out, # <--- Updated Name
                 "Avg WIP": avg_wip_val,
                 "Entropy Hi": round(h_val, 3),
                 "Interpretation": "Variable" if h_val > 2.4 else "Stable"
@@ -254,7 +253,7 @@ with tab2:
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
         s_df = pd.DataFrame(user_record["stations"])
 
-        metrics = ["Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
+        metrics = ["Throughput", "Avg WIP", "Entropy Hi", "Interpretation"] # <--- Updated Name
         rows_b = []
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics):
@@ -272,7 +271,7 @@ with tab2:
         st.subheader("Table B: Station-Level Flow Diagnostics")
         
         # This list MUST match the keys used in the dictionary in Tab 1
-        metrics_to_show = ["Dice Range", "Tot Output", "Avg WIP", "Entropy Hi", "Interpretation"]
+        metrics_to_show = ["Dice Range", "Throughput", "Avg WIP", "Entropy Hi", "Interpretation"] # <--- Updated Name
         
         rows_b = []
         for scen in s_df['Scenario'].unique():
@@ -312,8 +311,6 @@ with tab2:
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == target_station)]
                     
                     if not subset.empty:
-                        # MAINTAINING ORIGINAL CALCULATION LOGIC:
-                        # WIP * num_days / (divisor)
                         total_wip_accumulated = subset["Avg WIP"].values[0] * num_days
                         
                         if period == "Day-wise Avg WIP":
@@ -371,14 +368,14 @@ with tab3:
     with col1:
 
         st.write("### Throughput Rate ($TR$)")
-        st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily FG}}{n}")
+        st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily Throughput}}{n}")
 
         st.write("### Average System Entropy ($\bar{H}$)")
         st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
 
     with col2:
         st.write("### Lead Time ($L$)")
-        st.markdown("Calculated based on average daily WIP levels relative to output rate.")
+        st.markdown("Calculated based on average daily WIP levels relative to throughput rate.")
         st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
 
         st.write("### Entropy Spread ($\sigma H$)")
@@ -396,7 +393,3 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
-
-
-
-
