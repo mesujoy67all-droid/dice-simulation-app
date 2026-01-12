@@ -292,7 +292,7 @@ with tab2:
             st.table(df_table_b)
             
         st.markdown("---")
-        st.subheader("Table C: Temporal WIP Averages (Day/Week/Month)")
+        st.subheader("Table C: Temporal WIP Averages (By Buffer)")
 
         # Create Buffer Labels (AB, BC, CD...) based on active stations
         buffer_labels = [f"{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
@@ -301,23 +301,32 @@ with tab2:
         for scen in s_df['Scenario'].unique():
             for period in ["Day-wise Avg WIP", "Week-wise Avg WIP", "Month-wise Avg WIP"]:
                 row_data = {"Scenario": scen, "Time Metric": period}
-                for s_label in s_df['Station'].unique():
-                    subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
+                
+                for b_label in buffer_labels:
+                    # Map Buffer AB to Station B, BC to Station C, etc.
+                    target_station = f"Station {b_label[1]}" 
+                    subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == target_station)]
+                    
                     if not subset.empty:
+                        # MAINTAINING ORIGINAL CALCULATION LOGIC:
+                        # WIP * num_days / (divisor)
                         total_wip_accumulated = subset["Avg WIP"].values[0] * num_days
+                        
                         if period == "Day-wise Avg WIP":
                             val = total_wip_accumulated / num_days
                         elif period == "Week-wise Avg WIP":
                             val = total_wip_accumulated / (num_days / 5)
                         else: 
                             val = total_wip_accumulated / (num_days / 20)
-                        row_data[s_label] = round(val, 2)
+                        row_data[b_label] = round(val, 2)
                     else:
-                        row_data[s_label] = 0.0
+                        row_data[b_label] = 0.0
                 rows_c.append(row_data)
-        df_table_c = pd.DataFrame(rows_c).set_index(["Scenario", "Time Metric"])
-        st.table(df_table_c)
 
+        if rows_c:
+            df_table_c = pd.DataFrame(rows_c).set_index(["Scenario", "Time Metric"])
+            st.table(df_table_c)
+            
         st.markdown("---")
         st.subheader("📥 Export Analytics")
         output = io.BytesIO()
@@ -383,4 +392,5 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
