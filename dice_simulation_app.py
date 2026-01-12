@@ -1,4 +1,4 @@
-import streamlit as st
+aimport streamlit as st
 import pandas as pd
 import numpy as np
 from collections import defaultdict
@@ -168,6 +168,7 @@ with tab1:
 
         # Calculate additional rows
         total_output_row = df_pennies.sum().to_frame().T
+        "WIP at the End of the Simulation": int(final_wip_inventory)
         total_output_row.index = ["TOTAL OUTPUT"]
         
         entropy_vals = {m: round(calculate_entropy(pennies_movement_data[m]), 3) for m in members}
@@ -209,7 +210,7 @@ with tab1:
             "Days, Initial WIP & Dice Range": run_description,
             "Total Finished Goods": int(total_fg),
             "Throughput Rate (TR)": round(avg_throughput_rate, 2),
-            "Total WIP (W)": sum_total_wip,
+            "WIP at the End of the Simulation": int(final_wip_inventory)
             "Avg WIP (W_avg)": round(avg_total_wip_per_day, 2),
             "Lead Time (L = Avg WIP / TR)": calculated_lead_time,
             "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
@@ -340,5 +341,6 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
