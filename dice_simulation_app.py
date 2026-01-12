@@ -294,6 +294,9 @@ with tab2:
         st.markdown("---")
         st.subheader("Table C: Temporal WIP Averages (Day/Week/Month)")
 
+        # Create Buffer Labels (AB, BC, CD...) based on active stations
+        buffer_labels = [f"{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
+
         rows_c = []
         for scen in s_df['Scenario'].unique():
             for period in ["Day-wise Avg WIP", "Week-wise Avg WIP", "Month-wise Avg WIP"]:
@@ -380,3 +383,4 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
