@@ -204,18 +204,15 @@ with tab1:
         avg_total_wip_per_day = sum_total_wip / num_days
         calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
 
-        # Snapshot of final inventory state
-        final_wip_snapshot = sum(wip_buffers.values())
-
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": run_description,
             "Total Finished Goods": int(total_fg),
             "Throughput Rate (TR)": round(avg_throughput_rate, 2),
-            "WIP at the End of the Simulation": int(final_wip_inventory),
+            "Total WIP (W)": sum_total_wip,
             "Lead Time (L = Avg WIP / TR)": calculated_lead_time,
-            "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 2),
-            "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 2)
+            "Avg Entropy Ḣ": round(np.mean([calculate_entropy(st_output[m]) for m in members]), 3),
+            "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 3)
         })
 
         for m in members:
