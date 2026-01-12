@@ -165,6 +165,8 @@ with tab1:
         df_pennies = pd.DataFrame(pennies_movement_data)
         df_pennies.index = range(1, num_days + 1)
         df_pennies.index.name = "Day"
+        # Capture the final snapshot of inventory
+        final_wip_inventory = sum(wip_buffers.values())
 
         # Calculate additional rows
         total_output_row = df_pennies.sum().to_frame().T
@@ -343,6 +345,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
