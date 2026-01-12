@@ -225,19 +225,28 @@ with tab1:
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 2)
         })
 
-        # --- Updated Logging Logic for Table B ---
-        for m in members:
-            station_label = f"Station {m}"
+      for m in members:
             h_val = calculate_entropy(st_output[m])
-            tot_out = sum(st_output[m])
-            d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
-            
-            # Use np.mean on the specific WIP trend for this station
-            # Note: Station A has no 'previous' buffer, so we handle that
-            avg_wip_val = 0.0
-            if m != 'A':
-                avg_wip_val = round(np.mean(st_wip_trend[next(k.replace("WIP_", "") for k in wip_keys if k.endswith(m))]), 2)
+            user_record["stations"].append({
+                "Scenario": scen_label, 
+                "Station": f"Station {m}", 
+                "Dice Range": f"{dice_configs[m][0]}-{dice_configs[m][1]}",
+                "Tot Output": sum(st_output[m]), 
+                "Entropy Hi": round(h_val, 3),
+                "Interpretation": "Variable" if h_val > 2.4 else "Stable"
+            })
 
+        # 2. Store Buffer-Level Data for Table C (AB, BC, CD...)
+        if 'buffer_history' not in user_record:
+            user_record["buffer_history"] = []
+            
+        for b_key in st_wip_trend.keys():
+            avg_val = np.mean(st_wip_trend[b_key])
+            user_record["buffer_history"].append({
+                "Scenario": scen_label,
+                "Buffer Name": b_key,  # This will be "AB", "BC", etc.
+                "Daily Avg": avg_val
+            })
             user_record["stations"].append({
                 "Scenario": scen_label, 
                 "Station": station_label, 
@@ -291,29 +300,40 @@ with tab2:
             df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
             st.table(df_table_b)
             
-        st.markdown("---")
-        st.subheader("Table C: Temporal WIP Averages (Day/Week/Month)")
+       st.markdown("---")
+        st.subheader("Table C: Temporal WIP Averages (By Buffer)")
 
-        rows_c = []
-        for scen in s_df['Scenario'].unique():
-            for period in ["Day-wise Avg WIP", "Week-wise Avg WIP", "Month-wise Avg WIP"]:
-                row_data = {"Scenario": scen, "Time Metric": period}
-                for s_label in s_df['Station'].unique():
-                    subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
-                    if not subset.empty:
-                        total_wip_accumulated = subset["Avg WIP"].values[0] * num_days
-                        if period == "Day-wise Avg WIP":
-                            val = total_wip_accumulated / num_days
-                        elif period == "Week-wise Avg WIP":
-                            val = total_wip_accumulated / (num_days / 5)
-                        else: 
-                            val = total_wip_accumulated / (num_days / 20)
-                        row_data[s_label] = round(val, 2)
-                    else:
-                        row_data[s_label] = 0.0
-                rows_c.append(row_data)
-        df_table_c = pd.DataFrame(rows_c).set_index(["Scenario", "Time Metric"])
-        st.table(df_table_c)
+        if "buffer_history" in user_record and user_record["buffer_history"]:
+            b_df = pd.DataFrame(user_record["buffer_history"])
+            rows_c = []
+
+            # Iterate through every scenario saved
+            for scen in b_df['Scenario'].unique():
+                scen_b = b_df[b_df['Scenario'] == scen]
+                
+                # Define Time Metrics and their multipliers
+                time_metrics = [
+                    ("Day-wise Avg WIP", 1),
+                    ("Week-wise Avg WIP", 5),
+                    ("Month-wise Avg WIP", 20)
+                ]
+                
+                for label, multiplier in time_metrics:
+                    row_data = {"Scenario": scen, "Time Metric": label}
+                    
+                    # Add columns for each buffer (AB, BC, CD...)
+                    for b_name in b_df['Buffer Name'].unique():
+                        buffer_stats = scen_b[scen_b['Buffer Name'] == b_name]
+                        if not buffer_stats.empty:
+                            val = buffer_stats['Daily Avg'].values[0] * multiplier
+                            row_data[b_name] = round(float(val), 2)
+                        else:
+                            row_data[b_name] = 0.00
+                            
+                    rows_c.append(row_data)
+
+            df_table_c = pd.DataFrame(rows_c).set_index(["Scenario", "Time Metric"])
+            st.table(df_table_c)
 
         st.markdown("---")
         st.subheader("📥 Export Analytics")
@@ -380,6 +400,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
