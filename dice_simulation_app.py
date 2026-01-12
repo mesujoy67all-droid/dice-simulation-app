@@ -204,6 +204,8 @@ with tab1:
         avg_throughput_rate = total_fg / num_days
         avg_total_wip_per_day = sum_total_wip / num_days
         calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
+        # Capture the final snapshot of inventory
+        final_wip_inventory = sum(wip_buffers.values())
 
         user_record["history"].append({
             "Scenarios": scen_label,
@@ -341,6 +343,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
