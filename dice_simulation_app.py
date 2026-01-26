@@ -234,25 +234,41 @@ with tab1:
         })
 
         # --- Updated Logging Logic for Table B ---
+       # --- Updated Logging Logic for Table B (Monthly Analysis) ---
+        days_per_month = 20
+        num_months = num_days // days_per_month
+
         for m in members:
             station_label = f"Station {m}"
-            h_val = calculate_entropy(st_output[m])
-            tot_out = sum(st_output[m])
             d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
+            tot_out = sum(st_output[m])
             
-            # Use np.mean on the specific WIP trend for this station
+            # Calculate Avg WIP
             avg_wip_val = 0.0
             if m != 'A':
                 avg_wip_val = round(np.mean(st_wip_trend[next(k.replace("WIP_", "") for k in wip_keys if k.endswith(m))]), 2)
+
+            # Monthly Entropy Calculation
+            monthly_entropies = []
+            for month_idx in range(num_months):
+                start = month_idx * days_per_month
+                end = start + days_per_month
+                month_data = st_output[m][start:end]
+                monthly_entropies.append(calculate_entropy(month_data))
+            
+            # Calculate Monthly Mean and Spread
+            avg_h_monthly = round(np.mean(monthly_entropies), 3) if monthly_entropies else 0
+            spread_h_monthly = round(np.std(monthly_entropies), 3) if monthly_entropies else 0
 
             user_record["stations"].append({
                 "Scenario": scen_label, 
                 "Station": station_label, 
                 "Dice Range": d_range,
-                "Throughput": tot_out, # <--- Updated Name
+                "Throughput": tot_out,
                 "Avg WIP": avg_wip_val,
-                "Entropy Hi": round(h_val, 3),
-                "Interpretation": "Variable" if h_val > 2.4 else "Stable"
+                "Entropy Hi (Monthly Avg)": avg_h_monthly,
+                "Entropy Spread σH (Monthly)": spread_h_monthly, # New Row Data
+                "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
             })
 
 with tab2:
@@ -279,7 +295,14 @@ with tab2:
         st.subheader("Table B: Station-Level Flow Diagnostics")
         
         # This list MUST match the keys used in the dictionary in Tab 1
-        metrics_to_show = ["Dice Range", "Throughput", "Avg WIP", "Entropy Hi", "Interpretation"] # <--- Updated Name
+        metrics_to_show = [
+            "Dice Range", 
+            "Throughput", 
+            "Avg WIP", 
+            "Entropy Hi (Monthly Avg)", 
+            "Entropy Spread σH (Monthly)", 
+            "Interpretation"
+        ]
         
         rows_b = []
         for scen in s_df['Scenario'].unique():
@@ -293,6 +316,10 @@ with tab2:
                     else:
                         row_data[s_label] = "N/A"
                 rows_b.append(row_data)
+        
+        if rows_b:
+            df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
+            st.table(df_table_b)
         
         if rows_b:
             df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
@@ -401,4 +428,5 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
