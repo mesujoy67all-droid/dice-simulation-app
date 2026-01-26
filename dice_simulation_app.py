@@ -233,7 +233,7 @@ with tab1:
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 2)
         })
 
-      # --- Fixed Indentation: Monthly Logic for Table B ---
+      # --- Updated Logging Logic for Table B (Monthly Stats) ---
         days_per_month = 20
         num_months = int(np.ceil(num_days / days_per_month))
 
@@ -242,7 +242,7 @@ with tab1:
             d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
             tot_out = sum(st_output[m])
             
-            # Calculate Avg WIP for the specific station
+            # Calculate Avg WIP
             avg_wip_val = 0.0
             if m != 'A':
                 try:
@@ -251,7 +251,7 @@ with tab1:
                 except StopIteration:
                     avg_wip_val = 0.0
 
-            # Calculate Entropy Month-by-Month
+            # Monthly Entropy Calculations
             monthly_entropies = []
             for i in range(num_months):
                 start = i * days_per_month
@@ -295,46 +295,23 @@ with tab2:
             "Interpretation"
         ]
         
-        rows_b = []
-        for scen in s_df['Scenario'].unique():
-            for i, metric in enumerate(metrics_to_show):
-                # Ensure Scenario name only appears on the first row of the group
-                row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
-                
-                for s_label in s_df['Station'].unique():
-                    subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
-                    # Check if the column exists in the dataframe before accessing
-                    if not subset.empty and metric in subset.columns:
-                        row_data[s_label] = subset[metric].values[0]
-                    else:
-                        row_data[s_label] = "N/A"
-                rows_b.append(row_data)
+        st.markdown("---")
+        st.subheader("Table B: Station-Level Flow Diagnostics")
         
-        if rows_b:
-            df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
-            st.table(df_table_b)
+        # Define the exact metrics to show in order
+        metrics_to_show = [
+            "Dice Range", 
+            "Throughput", 
+            "Avg WIP", 
+            "Entropy Hi (Monthly Avg)", 
+            "Entropy Spread σH (Monthly)", 
+            "Interpretation"
+        ]
         
         rows_b = []
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics_to_show):
-                row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
-                
-                for s_label in s_df['Station'].unique():
-                    subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
-                    # The check 'metric in subset.columns' prevents the KeyError
-                    if not subset.empty and metric in subset.columns:
-                        row_data[s_label] = subset[metric].values[0]
-                    else:
-                        row_data[s_label] = "N/A"
-                rows_b.append(row_data)
-        
-        if rows_b:
-            df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
-            st.table(df_table_b)
-        
-        rows_b = []
-        for scen in s_df['Scenario'].unique():
-            for i, metric in enumerate(metrics_to_show):
+                # Only show Scenario name on the first row of each scenario group
                 row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
                 
                 for s_label in s_df['Station'].unique():
@@ -452,6 +429,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
