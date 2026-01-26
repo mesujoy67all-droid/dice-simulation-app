@@ -233,8 +233,8 @@ with tab1:
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 2)
         })
 
-      days_per_month = 20
-        # Calculate how many full or partial months exist
+      # --- Fixed Indentation: Monthly Logic for Table B ---
+        days_per_month = 20
         num_months = int(np.ceil(num_days / days_per_month))
 
         for m in members:
@@ -242,7 +242,7 @@ with tab1:
             d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
             tot_out = sum(st_output[m])
             
-            # 1. Calculate Avg WIP
+            # Calculate Avg WIP for the specific station
             avg_wip_val = 0.0
             if m != 'A':
                 try:
@@ -251,20 +251,17 @@ with tab1:
                 except StopIteration:
                     avg_wip_val = 0.0
 
-            # 2. Monthly Entropy Calculation
+            # Calculate Entropy Month-by-Month
             monthly_entropies = []
             for i in range(num_months):
                 start = i * days_per_month
-                end = min((i + 1) * days_per_month, num_days) # Handles the last month if < 20 days
+                end = min((i + 1) * days_per_month, num_days)
                 month_data = st_output[m][start:end]
-                
                 if len(month_data) > 0:
                     monthly_entropies.append(calculate_entropy(month_data))
             
-            # 3. Monthly Statistics
             avg_h_monthly = round(np.mean(monthly_entropies), 3) if monthly_entropies else 0.0
-            # Standard deviation requires at least one value (returns 0.0 if only 1 month)
-            spread_h_monthly = round(np.std(monthly_entropies), 3) if len(monthly_entropies) > 0 else 0.0
+            spread_h_monthly = round(np.std(monthly_entropies), 3) if len(monthly_entropies) > 1 else 0.0
 
             user_record["stations"].append({
                 "Scenario": scen_label, 
@@ -282,24 +279,13 @@ with tab2:
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
         s_df = pd.DataFrame(user_record["stations"])
 
-        metrics = ["Throughput", "Avg WIP", "Entropy Hi", "Interpretation"] # <--- Updated Name
-        rows_b = []
-        for scen in s_df['Scenario'].unique():
-            for i, metric in enumerate(metrics):
-                row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
-                for s_label in s_df['Station'].unique():
-                    subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
-                    row_data[s_label] = subset[metric].values[0] if not subset.empty else ""
-                rows_b.append(row_data)
-        df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
-
         st.subheader("Table A: Summary History")
         st.table(df_table_a)
         
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
         
-        # Keys here must match the dictionary keys in Tab 1 exactly
+        # Define the exact keys to show in the table
         metrics_to_show = [
             "Dice Range", 
             "Throughput", 
@@ -308,6 +294,25 @@ with tab2:
             "Entropy Spread σH (Monthly)", 
             "Interpretation"
         ]
+        
+        rows_b = []
+        for scen in s_df['Scenario'].unique():
+            for i, metric in enumerate(metrics_to_show):
+                # Ensure Scenario name only appears on the first row of the group
+                row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
+                
+                for s_label in s_df['Station'].unique():
+                    subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
+                    # Check if the column exists in the dataframe before accessing
+                    if not subset.empty and metric in subset.columns:
+                        row_data[s_label] = subset[metric].values[0]
+                    else:
+                        row_data[s_label] = "N/A"
+                rows_b.append(row_data)
+        
+        if rows_b:
+            df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
+            st.table(df_table_b)
         
         rows_b = []
         for scen in s_df['Scenario'].unique():
@@ -447,6 +452,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
