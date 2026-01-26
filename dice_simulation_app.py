@@ -260,8 +260,6 @@ with tab1:
                 if len(month_data) > 0:
                     monthly_entropies.append(calculate_entropy(month_data))
             
-            avg_h_monthly = round(np.mean(monthly_entropies), 3) if monthly_entropies else 0.0
-            spread_h_monthly = round(np.std(monthly_entropies), 3) if len(monthly_entropies) > 1 else 0.0
 
             user_record["stations"].append({
                 "Scenario": scen_label, 
@@ -282,18 +280,6 @@ with tab2:
         st.subheader("Table A: Summary History")
         st.table(df_table_a)
         
-        st.markdown("---")
-        st.subheader("Table B: Station-Level Flow Diagnostics")
-        
-        # Define the exact keys to show in the table
-        metrics_to_show = [
-            "Dice Range", 
-            "Throughput", 
-            "Avg WIP", 
-            "Entropy Hi (Monthly Avg)", 
-            "Entropy Spread σH (Monthly)", 
-            "Interpretation"
-        ]
         
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
@@ -429,6 +415,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
