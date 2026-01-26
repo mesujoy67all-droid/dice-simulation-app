@@ -261,7 +261,7 @@ with tab1:
                     monthly_entropies.append(calculate_entropy(month_data))
             
             avg_h_monthly = round(np.mean(monthly_entropies), 3) if monthly_entropies else 0.0
-            spread_h_monthly = round(np.std(monthly_entropies), 3)
+            spread_h_monthly = round(np.std(monthly_entropies), 3) if monthly_entropies else 0.0
 
             user_record["stations"].append({
                 "Scenario": scen_label, 
@@ -417,6 +417,7 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
 
 
 
