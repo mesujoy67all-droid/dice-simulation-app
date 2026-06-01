@@ -75,7 +75,8 @@ num_members = st.sidebar.number_input("Workstations", min_value=2, value=7, max_
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
-# --- UPDATED CAPACITY MANAGEMENT WITH OVERRIDE LOGIC ---
+# --- [MOVED UP] CAPACITY SOURCE CONFIGURATION ---
+st.sidebar.markdown("---")
 st.sidebar.subheader("🎲 Capacity Generation Mode")
 capacity_source = st.sidebar.radio(
     "Choose Capacity Source:",
@@ -84,12 +85,7 @@ capacity_source = st.sidebar.radio(
 )
 
 uploaded_df = None
-dice_configs = {}
-
-# Keep sliders active for BOTH options so you can tweak the bottleneck on top of your file!
-st.sidebar.markdown("### 🎛️ Station Configuration Sliders")
-for m in members:
-    dice_configs[m] = st.sidebar.slider(f"Dice Range for {m}", 1, 20, (1, 6))
+override_stations = []
 
 if capacity_source == "Upload CSV/Excel + Tweak Sliders":
     uploaded_file = st.sidebar.file_uploader("Upload Base Capacity File (CSV or XLSX)", type=["csv", "xlsx"])
@@ -111,16 +107,22 @@ if capacity_source == "Upload CSV/Excel + Tweak Sliders":
         except Exception as e:
             st.sidebar.error(f"Error loading file: {e}")
             
-    # Allow user to check which stations should drop the uploaded data and use the slider values instead
-    st.sidebar.markdown("### 🚨 Override Bottlenecks")
+    # Checkbox picker for overrides sits directly below the file uploader now
     override_stations = st.sidebar.multiselect(
         "Select Stations to OVERRIDE with Slider Ranges instead of File Data:",
         options=members,
         help="Check the stations where you want to ignore the file data and deploy your new dice configuration."
     )
-else:
-    override_stations = []
 
+# --- STATION CONFIGURATION SLIDERS ---
+st.sidebar.markdown("### 🎛️ Station Configuration Sliders")
+dice_configs = {}
+for m in members:
+    # Highlights visually if a station is currently overriding uploaded file data
+    label_prefix = "🚨 " if m in override_stations else ""
+    dice_configs[m] = st.sidebar.slider(f"{label_prefix}Dice Range for {m}", 1, 20, (1, 6))
+
+st.sidebar.markdown("---")
 wip_keys_list = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
@@ -165,12 +167,10 @@ with tab1:
         d_range_log = {}
         
         for m in members:
-            # If pure random, or if this specific station is selected for a bottleneck breakthrough override
             if capacity_source == "Pure Random (Dice)" or m in override_stations:
                 dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
                 d_range_log[m] = f"{dice_configs[m][0]}-{dice_configs[m][1]} (Dice)"
             else:
-                # Fallback to the uploaded file configuration data
                 dice_rolls[m] = uploaded_df[m].head(num_days).tolist()
                 d_range_log[m] = "Uploaded Data"
 
