@@ -56,35 +56,69 @@ user_record = st.session_state.user_db[current_user]
 st.sidebar.header(f"👤 Active: {current_user}")
 st.sidebar.header("Simulation Settings")
 
-# --- NEW SEED LOGIC ---
+# --- SEED LOGIC ---
 if 'sim_seed' not in st.session_state:
     st.session_state.sim_seed = None
 
-# Added the requested button/toggle logic
 keep_seed = st.sidebar.toggle("🔒 Keep the same seed (for replication)", value=False)
 
 if not keep_seed:
-    # Generate a new random seed every time the app logic refreshes if not locked
     st.session_state.sim_seed = np.random.randint(0, 1000000)
 
 st.sidebar.caption(f"Current Seed: {st.session_state.sim_seed}")
 # ----------------------
 
-members_list = [chr(64 + i) for i in range(1, 9)] 
-dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members_list}
-
-wip_keys_list = [f"WIP_{members_list[i]}{members_list[i+1]}" for i in range(len(members_list) - 1)]
-initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys_list}
-
+# System Constraints (Fixed configurations)
 num_days = st.sidebar.number_input("Days", min_value=1, value=1500, max_value=1500)
 num_members = st.sidebar.number_input("Workstations", min_value=2, value=7, max_value=7)
 
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
+# --- NEW FEATURE: CAPACITY SOURCE CONFIGURATION ---
+st.sidebar.subheader("🎲 Capacity Generation Mode")
+capacity_source = st.sidebar.radio(
+    "Choose Capacity Source:",
+    ["Random (Dice Rolls)", "Upload CSV/Excel"],
+    help="Select whether to generate capacities randomly or upload a preset timeline table."
+)
+
+uploaded_df = None
+dice_configs = {}
+
+if capacity_source == "Random (Dice Rolls)":
+    members_list_full = [chr(64 + i) for i in range(1, 9)] 
+    dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members}
+else:
+    uploaded_file = st.sidebar.file_uploader("Upload Capacity File (CSV or XLSX)", type=["csv", "xlsx"])
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                uploaded_df = pd.read_csv(uploaded_file)
+            else:
+                uploaded_df = pd.read_excel(uploaded_file)
+            
+            # Basic validation check
+            missing_cols = [m for m in members if m not in uploaded_df.columns]
+            if missing_cols:
+                st.sidebar.error(f"Missing station columns in file: {missing_cols}")
+                uploaded_df = None
+            elif len(uploaded_df) < num_days:
+                st.sidebar.warning(f"File has {len(uploaded_df)} rows. Will only simulate up to that row count.")
+                num_days = len(uploaded_df)
+        except Exception as e:
+            st.sidebar.error(f"Error loading file: {e}")
+
+wip_keys_list = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
+initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
+
 # The "Run" button
 if st.sidebar.button("▶ Run & Save Simulation"):
-    st.session_state.trigger_sim = True
+    if capacity_source == "Upload CSV/Excel" and uploaded_df is None:
+        st.sidebar.error("Please upload a valid capacity file before running.")
+        st.session_state.trigger_sim = False
+    else:
+        st.session_state.trigger_sim = True
 else:
     st.session_state.trigger_sim = False
 
@@ -112,14 +146,20 @@ with tab1:
     st.title("🚀 Live Operations Console")
     
     if st.session_state.get('trigger_sim', False):
-        # Apply the seed before generating any random numbers
         np.random.seed(st.session_state.sim_seed)
         
-        # 1. Capacity Generation
-        dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
-        df_dice = pd.DataFrame(dice_rolls)
-        df_dice.index = range(1, num_days + 1)
-        df_dice.index.name = "Day"
+        # 1. Capacity Processing (Random Generation or File Parsing)
+        if capacity_source == "Random (Dice Rolls)":
+            dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
+            df_dice = pd.DataFrame(dice_rolls)
+            df_dice.index = range(1, num_days + 1)
+            df_dice.index.name = "Day"
+        else:
+            # Slice user uploaded table to exact simulation window length and clean index
+            df_dice = uploaded_df[members].head(num_days).copy()
+            df_dice.index = range(1, len(df_dice) + 1)
+            df_dice.index.name = "Day"
+            num_days = len(df_dice)
 
         # 2. Simulation Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
@@ -137,7 +177,7 @@ with tab1:
                 roll = day_rolls[m]
                 
                 if i == 0:
-                    # Station A logic: Move always equals Dice Roll
+                    # Station A logic: Move always equals Capacity Roll
                     move_a = roll
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     wip_buffers[nxt] += move_a
@@ -174,8 +214,8 @@ with tab1:
 
         # --- DISPLAY RESULTS ---
         
-        # 1. Dice Rolls (Original)
-        st.subheader("🎲 Table of Dice Rolls (Capacity)")
+        # 1. Capacity Display Matrix
+        st.subheader("🎲 Table of Capacity Values")
         st.dataframe(df_dice, use_container_width=True)
 
         # 2. Pennies Movement (UPDATED WITH SUMMARY ROWS)
@@ -186,7 +226,7 @@ with tab1:
 
         # Calculate additional rows
         total_output_row = df_pennies.sum().to_frame().T
-        total_output_row.index = ["THROUGHPUT"] # <--- Updated Name
+        total_output_row.index = ["THROUGHPUT"]
         
         entropy_vals = {m: round(calculate_entropy(pennies_movement_data[m]), 3) for m in members}
         entropy_row = pd.DataFrame([entropy_vals])
@@ -203,7 +243,7 @@ with tab1:
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         st.dataframe(results_df, use_container_width=True)
 
-        # 1. Determine the Title for the current run
+        # Determine the Title for the current run
         history_count = len(user_record["history"])
         if history_count == 0:
             display_title = "🏁 Base Run Results"
@@ -219,7 +259,7 @@ with tab1:
 
         # Update the columns to show all three metrics
         c1, c2, c3 = st.columns(3)
-        c1.metric("Throughput", int(total_fg)) # <--- Updated Name
+        c1.metric("Throughput", int(total_fg))
         c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
         c3.metric("Ending WIP Inventory", int(final_wip_inventory)) 
 
@@ -229,8 +269,14 @@ with tab1:
         # --- Logging Logic ---
         scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={initial_wip[k]}" for k in wip_keys])
-        dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
-        run_description = f"Days={num_days} | WIP: {wip_summary} | Dice: {dice_info}"
+        
+        if capacity_source == "Random (Dice Rolls)":
+            dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
+            run_description = f"Days={num_days} | WIP: {wip_summary} | Dice: {dice_info}"
+            d_range_log = {m: f"{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members}
+        else:
+            run_description = f"Days={num_days} | WIP: {wip_summary} | Custom File Upload Flow"
+            d_range_log = {m: "Uploaded Data" for m in members}
 
         avg_throughput_rate = total_fg / num_days
         avg_total_wip_per_day = sum_total_wip / num_days
@@ -242,7 +288,7 @@ with tab1:
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": run_description,
-            "Throughput": int(total_fg), # <--- Updated Name
+            "Throughput": int(total_fg),
             "Throughput Rate (TR)": round(avg_throughput_rate, 2),
             "Avg WIP (W_avg)": round(avg_total_wip_per_day, 2),
             "WIP at the End of the Simulation": int(final_wip_inventory),
@@ -251,13 +297,12 @@ with tab1:
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 2)
         })
 
-      # --- Updated Logging Logic for Table B (Monthly Stats) ---
+        # --- Updated Logging Logic for Table B (Monthly Stats) ---
         days_per_month = 20
         num_months = int(np.ceil(num_days / days_per_month))
 
         for m in members:
             station_label = f"Station {m}"
-            d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
             tot_out = sum(st_output[m])
             
             # Calculate Avg WIP
@@ -284,13 +329,14 @@ with tab1:
             user_record["stations"].append({
                 "Scenario": scen_label, 
                 "Station": station_label, 
-                "Dice Range": d_range,
+                "Dice Range": d_range_log[m],
                 "Throughput": tot_out,
                 "Avg WIP": avg_wip_val,
                 "Entropy Hi (Monthly Avg)": avg_h_monthly,
                 "Entropy Spread σH (Monthly)": spread_h_monthly,
                 "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
             })
+
 with tab2:
     st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
@@ -300,11 +346,9 @@ with tab2:
         st.subheader("Table A: Summary History")
         st.table(df_table_a)
         
-        
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
         
-        # Define the exact metrics to show in order
         metrics_to_show = [
             "Dice Range", 
             "Throughput", 
@@ -317,7 +361,6 @@ with tab2:
         rows_b = []
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics_to_show):
-                # Only show Scenario name on the first row of each scenario group
                 row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
                 
                 for s_label in s_df['Station'].unique():
@@ -348,7 +391,6 @@ with tab2:
                 row_data = {"Scenario": scen, "Time Metric": period}
                 
                 for b_label in buffer_labels:
-                    # Map Buffer AB to Station B, BC to Station C, etc.
                     target_station = f"Station {b_label[1]}" 
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == target_station)]
                     
@@ -384,7 +426,6 @@ with tab2:
         st.info("No recorded history found for this User ID.")
 
 # --- PAGE 3: METHODOLOGY ---
-
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
     st.markdown("""
@@ -398,17 +439,16 @@ with tab3:
 
     st.info("""
     **The Student's Guide to Movement Logic:**
-    The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
+    The actual work done is the **minimum** of your ability (Dice or Uploaded Capacity Capacity) and your availability (Buffer).
     """)
 
-    st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
+    st.latex(r"\text{Movement}_{B} = \min(\text{Capacity}_{B}, \text{Buffer}_{A \to B})")
 
     st.markdown("---")
 
     st.header("📊 Table A: Summary History")
     col1, col2 = st.columns(2)
     with col1:
-
         st.write("### Throughput Rate ($TR$)")
         st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily Throughput}}{n}")
 
@@ -435,12 +475,3 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
-
-
-
-
-
-
-
-
-
