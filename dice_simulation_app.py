@@ -73,7 +73,6 @@ uploaded_df = None
 num_days = 1500
 num_members = 7
 dice_configs = {}
-station_frequencies = {} 
 
 if capacity_mode == "Random Generation":
     if 'sim_seed' not in st.session_state:
@@ -90,17 +89,6 @@ if capacity_mode == "Random Generation":
     
     for m in members_list:
         dice_configs[m] = st.sidebar.slider(f"Dice Range for {m}", 1, 20, (1, 6))
-        
-        # UPGRADED: Expanded selectbox options list up to 30 days for Random selection layout
-        if not is_base_run:
-            station_frequencies[m] = st.sidebar.selectbox(
-                f"Run Frequency for {m}", 
-                list(range(1, 31)), 
-                index=0, 
-                format_func=lambda x: "Every Day" if x == 1 else f"Once in {x} Days"
-            )
-        else:
-            station_frequencies[m] = 1 
 
     num_days = st.sidebar.number_input("Days", min_value=1, value=1500, max_value=1500)
     num_members = st.sidebar.number_input("Workstations", min_value=2, value=7, max_value=7)
@@ -126,27 +114,16 @@ else:
         temp_members = [chr(64 + i) for i in range(1, num_members + 1)]
         
         if is_base_run:
-            st.sidebar.warning("🔒 Base Run Active: Custom dice modifiers and intervals are locked.")
+            st.sidebar.warning("🔒 Base Run Active: Custom dice modifiers are locked.")
             for m in temp_members:
                 dice_configs[m] = (1, 6)
-                station_frequencies[m] = 1
         else:
             st.sidebar.markdown("---")
             st.sidebar.header("🚀 Scenario Improvements")
             st.sidebar.info(f"Modifying Scenario #{history_count}. Set custom parameters below:")
             
             for m in temp_members:
-                col1, col2 = st.sidebar.columns(2)
-                with col1:
-                    dice_configs[m] = st.slider(f"Range {m}", 1, 20, (1, 6))
-                with col2:
-                    # UPGRADED: Expanded choice matrix list to select dynamic intervals up to 30 days
-                    station_frequencies[m] = st.selectbox(
-                        f"Freq {m}", 
-                        list(range(1, 31)), 
-                        index=0, 
-                        format_func=lambda x: "Daily" if x == 1 else f"1 in {x} Days"
-                    )
+                dice_configs[m] = st.sidebar.slider(f"Range {m}", 1, 20, (1, 6))
 
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
@@ -218,17 +195,10 @@ if run_sim_clicked:
                     if (low != 1) or (high != 6):
                         df_dice[m] = [np.random.randint(low, high + 1) for _ in range(num_days)]
 
-        # --- APPLY TIMING FREQUENCY MODIFIERS DYNAMICALLY ---
+        # --- PROCESS LOGGING CONTEXTS (Implicit Daily Run) ---
         applied_configs_desc = []
         for m in members:
-            freq = station_frequencies.get(m, 1)
-            if freq > 1:
-                for day in df_dice.index:
-                    if (day - 1) % freq != 0:
-                        df_dice.at[day, m] = 0
-                applied_configs_desc.append(f"{m}(Range:{dice_configs[m][0]}-{dice_configs[m][1]}, Freq:1/{freq} days)")
-            else:
-                applied_configs_desc.append(f"{m}(Range:{dice_configs[m][0]}-{dice_configs[m][1]}, Freq:Daily)")
+            applied_configs_desc.append(f"{m}(Range:{dice_configs[m][0]}-{dice_configs[m][1]})")
 
         dice_info = " | ".join(applied_configs_desc)
 
@@ -323,8 +293,7 @@ if run_sim_clicked:
         for m in members:
             station_label = f"Station {m}"
             low, high = dice_configs.get(m, (1, 6))
-            f_val = station_frequencies.get(m, 1)
-            d_range = f"{low}-{high} (Freq: 1/{f_val}d)"
+            d_range = f"{low}-{high}"
             
             tot_out = sum(st_output[m])
             avg_wip_val = 0.0
