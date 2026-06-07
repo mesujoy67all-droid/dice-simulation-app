@@ -52,10 +52,13 @@ if st.session_state.authenticated_user is None:
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
+# Determine history count to check current state (Base Run vs Scenarios)
+history_count = len(user_record["history"])
+is_base_run = (history_count == 0)
+
 # --- Sidebar: User Controls & Settings ---
 st.sidebar.header(f"👤 Active: {current_user}")
 
-# --- NEW: CAPACITY INPUT MODE SELECTION ---
 st.sidebar.header("Capacity Source Selection")
 capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Excel File"])
 
@@ -63,6 +66,8 @@ capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generat
 uploaded_df = None
 num_days = 1500
 num_members = 7
+dice_boosts = {}
+dice_configs = {}
 
 if capacity_mode == "Random Generation":
     st.sidebar.header("Simulation Settings")
@@ -78,7 +83,7 @@ if capacity_mode == "Random Generation":
     st.sidebar.caption(f"Current Seed: {st.session_state.sim_seed}")
     
     members_list = [chr(64 + i) for i in range(1, 9)] 
-    dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members_list}
+    dice_configs = {m: st.sidebar.slider(f"Dice Range for {m}", 1, 20, (1, 6)) for m in members_list}
     
     num_days = st.sidebar.number_input("Days", min_value=1, value=1500, max_value=1500)
     num_members = st.sidebar.number_input("Workstations", min_value=2, value=7, max_value=7)
@@ -89,16 +94,30 @@ else:
     
     if uploaded_file is not None:
         try:
-            # Read excel sheet, ensuring index is treated correctly
+            # Read excel sheet
             uploaded_df = pd.read_excel(uploaded_file, index_col=0)
             num_days = len(uploaded_df)
             num_members = len(uploaded_df.columns)
             
-            st.sidebar.success(f"Loaded: {num_days} Days across {num_members} Stations.")
+            st.sidebar.success(f"📂 Loaded Baseline: {num_days} Days, {num_members} Stations.")
         except Exception as e:
             st.sidebar.error(f"Error parsing file: {e}. Ensure 'Day' is the first column.")
+            
+    # --- SCENARIO MODIFICATION LOGIC FOR EXCEL FILE ---
+    if not is_base_run and uploaded_df is not None:
+        st.sidebar.markdown("---")
+        st.sidebar.header("🚀 Scenario Improvements")
+        st.sidebar.info(f"Modifying Scenario #{history_count}. Add capacity boosts to optimize your baseline flow!")
+        
+        # Create an additive modifier slider for every loaded station column
+        temp_members = [chr(64 + i) for i in range(1, num_members + 1)]
+        for m in temp_members:
+            dice_boosts[m] = st.sidebar.slider(f"Capacity Boost for Station {m}", 0, 10, 0, help="Adds static capacity to this station's daily imported excel value.")
+    elif is_base_run and uploaded_df is not None:
+        st.sidebar.markdown("---")
+        st.sidebar.warning("🔒 Base Run Active: Dice modification parameters are locked to imported values.")
 
-# Generate target structures dynamically based on setup
+# Generate target structures dynamically based on setup dimensions
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
@@ -149,11 +168,22 @@ with tab1:
             df_dice.index.name = "Day"
             dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         else:
-            # Match user template columns dynamically to clean string designations ('A', 'B', etc.)
+            # Map columns to correct string names
             df_dice = uploaded_df.copy()
             df_dice.columns = members
             df_dice.index.name = "Day"
-            dice_info = "Imported from Excel"
+            
+            # Apply dynamic strategic adjustments if we are past the Base Run stage
+            if not is_base_run and dice_boosts:
+                applied_boosts_desc = []
+                for m in members:
+                    boost = dice_boosts.get(m, 0)
+                    if boost > 0:
+                        df_dice[m] = df_dice[m] + boost
+                        applied_boosts_desc.append(f"{m}(+{boost})")
+                dice_info = f"Excel + Modifiers: {', '.join(applied_boosts_desc)}" if applied_boosts_desc else "Excel (No modifiers changed)"
+            else:
+                dice_info = "Imported Base Excel Values (Locked)"
 
         # 2. Simulation Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
@@ -171,14 +201,12 @@ with tab1:
                 roll = day_rolls[m]
                 
                 if i == 0:
-                    # Station A logic: Move always equals Dice Roll
                     move_a = roll
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     wip_buffers[nxt] += move_a
                     st_output[m].append(move_a)
                     pennies_movement_data[m].append(move_a)
                 elif i == len(members) - 1:
-                    # Last Station logic
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     move_last = min(roll, wip_buffers[prv])
                     wip_buffers[prv] -= move_last
@@ -187,7 +215,6 @@ with tab1:
                     st_output[m].append(move_last)
                     pennies_movement_data[m].append(move_last)
                 else:
-                    # Middle Station logic
                     prv = f"WIP_{members[i-1]}{members[i]}"
                     nxt = f"WIP_{members[i]}{members[i+1]}"
                     move_mid = min(roll, wip_buffers[prv])
@@ -207,18 +234,14 @@ with tab1:
             })
 
         # --- DISPLAY RESULTS ---
-        
-        # 1. Dice Rolls
-        st.subheader("🎲 Table of Dice Rolls (Capacity)")
+        st.subheader("🎲 Table of Dice Rolls (Capacity Applied)")
         st.dataframe(df_dice, use_container_width=True)
 
-        # 2. Pennies Movement
         st.subheader("🪙 Day-wise Pennies Movement")
         df_pennies = pd.DataFrame(pennies_movement_data)
         df_pennies.index = range(1, num_days + 1)
         df_pennies.index.name = "Day"
 
-        # Calculate additional rows
         total_output_row = df_pennies.sum().to_frame().T
         total_output_row.index = ["THROUGHPUT"]
         
@@ -226,27 +249,18 @@ with tab1:
         entropy_row = pd.DataFrame([entropy_vals])
         entropy_row.index = ["ENTROPY (H)"]
 
-        # Concatenate summary rows to the main dataframe
         df_pennies_final = pd.concat([df_pennies, total_output_row, entropy_row])
         st.dataframe(df_pennies_final, use_container_width=True)
 
-        # 3. WIP History
         st.subheader("📦 Work-In-Progress (WIP) History")
         results_df = pd.DataFrame(history).set_index("Day")
         results_df["Cumulative Throughput"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         st.dataframe(results_df, use_container_width=True)
 
-        # Determine the Title for the current run
-        history_count = len(user_record["history"])
-        if history_count == 0:
-            display_title = "🏁 Base Run Results"
-            scen_label = "Base-Run"
-        else:
-            display_title = f"🏁 Scenario #{history_count} Results"
-            scen_label = f"Scenario #{history_count}"
-        
-        st.subheader(display_title)
+        # Setup Labels for logging history records
+        scen_label = "Base-Run" if is_base_run else f"Scenario #{history_count}"
+        st.subheader(f"🏁 {scen_label} Results")
         
         final_wip_inventory = sum(wip_buffers.values())
 
@@ -258,10 +272,9 @@ with tab1:
         st.subheader("📈 Performance Trends")
         st.line_chart(results_df[["Daily_Total_WIP", "Cumulative Throughput"]])
 
-        # --- Logging Logic ---
-        scen_label = "Base-Run" if not user_record["history"] else f"Scenario #{len(user_record['history'])}"
+        # --- Logging Table Parameters ---
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={initial_wip[k]}" for k in wip_keys])
-        run_description = f"Days={num_days} | Mode={capacity_mode} | WIP: {wip_summary} | Dice: {dice_info}"
+        run_description = f"Days={num_days} | Mode={capacity_mode} | WIP: {wip_summary} | Dice Configs: {dice_info}"
 
         avg_throughput_rate = total_fg / num_days
         avg_total_wip_per_day = sum_total_wip / num_days
@@ -279,16 +292,19 @@ with tab1:
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 2)
         })
 
-        # --- Logging Logic for Table B (Monthly Stats) ---
+        # --- Logging Station Flow Diagnostics ---
         days_per_month = 20
         num_months = int(np.ceil(num_days / days_per_month))
 
         for m in members:
             station_label = f"Station {m}"
-            d_range = "Excel Input" if capacity_mode == "Import Excel File" else f"{dice_configs[m][0]}-{dice_configs[m][1]}"
+            if capacity_mode == "Import Excel File":
+                d_range = f"Excel Base" if is_base_run else f"Excel (+{dice_boosts.get(m, 0)})"
+            else:
+                d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
+                
             tot_out = sum(st_output[m])
             
-            # Calculate Avg WIP
             avg_wip_val = 0.0
             if m != 'A':
                 try:
@@ -297,7 +313,6 @@ with tab1:
                 except StopIteration:
                     avg_wip_val = 0.0
 
-            # Monthly Entropy Calculations
             monthly_entropies = []
             for i in range(num_months):
                 start = i * days_per_month
@@ -319,6 +334,9 @@ with tab1:
                 "Entropy Spread σH (Monthly)": spread_h_monthly,
                 "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
             })
+        
+        # Force a state refresh so sidebar configuration locks update dynamically on next interaction
+        st.rerun()
 
 with tab2:
     st.title("📊 Strategic Performance Analytics")
@@ -361,7 +379,6 @@ with tab2:
         st.markdown("---")
         st.subheader("Table C: Temporal WIP Averages (By Buffer)")
         all_recorded_stations = s_df['Station'].unique()
-
         recorded_letters = sorted([s.split(" ")[1] for s in all_recorded_stations])
         
         buffer_labels = []
@@ -411,48 +428,5 @@ with tab2:
 # --- PAGE 3: METHODOLOGY ---
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
-    st.markdown("""
-    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
-    """)
-
-    st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
-    st.markdown("### System Architecture")
-    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
-    st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
-
-    st.info("""
-    **The Student's Guide to Movement Logic:**
-    The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
-    """)
-
+    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer.")
     st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
-    st.markdown("---")
-
-    st.header("📊 Table A: Summary History")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("### Throughput Rate ($TR$)")
-        st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily Throughput}}{n}")
-
-        st.write("### Average System Entropy ($\bar{H}$)")
-        st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
-
-    with col2:
-        st.write("### Lead Time ($L$)")
-        st.markdown("Calculated based on average daily WIP levels relative to throughput rate.")
-        st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
-
-        st.write("### Entropy Spread ($\sigma H$)")
-        st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
-
-    st.markdown("---")
-    st.header("🔬 Table B: Station-Level Flow Diagnostics")
-    st.latex(r"H = -\sum P(x) \log_2 P(x)")
-
-    st.markdown("""
-    **How to read Table B:**
-    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**.
-    * **Entropy ($H_i$):**
-        * **Stable (< 2.4):** Predictable output.
-        * **Variable (≥ 2.4):** High 'jitter' or chaos.
-    """)
