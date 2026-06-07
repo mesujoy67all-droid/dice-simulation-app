@@ -144,7 +144,7 @@ if capacity_mode == "Random Generation":
             else:
                 station_frequencies[m] = 1 
 
-    num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500, disabled=True)
+    num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500)
     num_members = 7
 
 else:
