@@ -1,10 +1,3 @@
-Here is the updated code. To make it much easier for students to separate and configure each station in the sidebar without getting lost, I have wrapped each station's inputs inside a distinct, visually isolated card container (`st.sidebar.container(border=True)`).
-
-This acts as a clean structural partition on the user interface, separating the stations with clear borders and bold headers.
-
-Here is your updated script:
-
-```python
 import streamlit as st
 import pandas as pd
 import numpy as np
