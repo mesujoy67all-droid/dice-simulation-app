@@ -66,7 +66,7 @@ st.sidebar.header(f"👤 Active: {current_user}")
 # SECTION 1: CAPACITY INPUT CONFIGURATION
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ Capacity Configuration")
-capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Excel File"])
+capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
 
 # Initialize dynamic operational variables
 uploaded_df = None
@@ -93,16 +93,24 @@ if capacity_mode == "Random Generation":
     num_members = st.sidebar.number_input("Workstations", min_value=2, value=7, max_value=7)
 
 else:
-    uploaded_file = st.sidebar.file_uploader("Upload your 'Table of Dice Rolls' file", type=["xlsx", "xls"])
+    uploaded_file = st.sidebar.file_uploader("Upload your 'Table of Dice Rolls' file", type=["xlsx", "xls", "csv"])
     
     if uploaded_file is not None:
         try:
-            uploaded_df = pd.read_excel(uploaded_file, index_col=0)
+            # Flexible reading for Excel or CSV
+            if uploaded_file.name.endswith('.csv'):
+                uploaded_df = pd.read_csv(uploaded_file, index_col=0)
+            else:
+                uploaded_df = pd.read_excel(uploaded_file, index_col=0)
+            
+            # Clean dataframe values to make sure they are integers
+            uploaded_df = uploaded_df.apply(pd.to_numeric, errors='coerce').fillna(0).astype(int)
+            
             num_days = len(uploaded_df)
             num_members = len(uploaded_df.columns)
             st.sidebar.success(f"📂 Loaded Baseline: {num_days} Days, {num_members} Stations.")
         except Exception as e:
-            st.sidebar.error(f"Error parsing file: {e}. Ensure 'Day' is the first column.")
+            st.sidebar.error(f"Error parsing file: {e}. Ensure day counts are structural records.")
             
     if not is_base_run and uploaded_df is not None:
         st.sidebar.info(f"Modifying Scenario #{history_count}. Add capacity boosts to optimize your baseline flow!")
@@ -160,8 +168,8 @@ def calculate_entropy(values):
 
 # --- Simulation Processing Engine ---
 if run_sim_clicked:
-    if capacity_mode == "Import Excel File" and uploaded_df is None:
-        st.sidebar.error("Please upload a valid Excel file first!")
+    if "Import" in capacity_mode and uploaded_df is None:
+        st.sidebar.error("Please upload a valid Excel or CSV file first!")
     else:
         # 1. Capacity Generation/Loading
         if capacity_mode == "Random Generation":
@@ -183,9 +191,9 @@ if run_sim_clicked:
                     if boost > 0:
                         df_dice[m] = df_dice[m] + boost
                         applied_boosts_desc.append(f"{m}(+{boost})")
-                dice_info = f"Excel + Modifiers: {', '.join(applied_boosts_desc)}" if applied_boosts_desc else "Excel (No modifiers changed)"
+                dice_info = f"Imported Data + Modifiers: {', '.join(applied_boosts_desc)}" if applied_boosts_desc else "Imported Data (No modifiers changed)"
             else:
-                dice_info = "Imported Base Excel Values (Locked)"
+                dice_info = "Imported Base Data Values (Locked)"
 
         # 2. Simulation Operations Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
@@ -277,8 +285,8 @@ if run_sim_clicked:
         num_months = int(np.ceil(num_days / days_per_month))
         for m in members:
             station_label = f"Station {m}"
-            if capacity_mode == "Import Excel File":
-                d_range = f"Excel Base" if is_base_run else f"Excel (+{dice_boosts.get(m, 0)})"
+            if "Import" in capacity_mode:
+                d_range = f"Imported Base" if is_base_run else f"Imported (+{dice_boosts.get(m, 0)})"
             else:
                 d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
             tot_out = sum(st_output[m])
