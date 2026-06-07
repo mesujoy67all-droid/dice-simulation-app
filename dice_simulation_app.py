@@ -14,7 +14,7 @@ if 'user_db' not in st.session_state:
 if 'authenticated_user' not in st.session_state:
     st.session_state.authenticated_user = None
 
-# --- NEW: PERSISTENCE STORAGE INITIALIZATION ---
+# --- PERSISTENCE STORAGE INITIALIZATION ---
 if 'active_results' not in st.session_state:
     st.session_state.active_results = None
 
@@ -63,7 +63,9 @@ is_base_run = (history_count == 0)
 # --- Sidebar: User Controls & Settings ---
 st.sidebar.header(f"👤 Active: {current_user}")
 
-st.sidebar.header("Capacity Source Selection")
+# SECTION 1: CAPACITY INPUT CONFIGURATION
+st.sidebar.markdown("---")
+st.sidebar.header("⚙️ Capacity Configuration")
 capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Excel File"])
 
 # Initialize dynamic operational variables
@@ -74,8 +76,6 @@ dice_boosts = {}
 dice_configs = {}
 
 if capacity_mode == "Random Generation":
-    st.sidebar.header("Simulation Settings")
-    
     if 'sim_seed' not in st.session_state:
         st.session_state.sim_seed = None
 
@@ -93,7 +93,6 @@ if capacity_mode == "Random Generation":
     num_members = st.sidebar.number_input("Workstations", min_value=2, value=7, max_value=7)
 
 else:
-    st.sidebar.header("Upload Capacity Excel")
     uploaded_file = st.sidebar.file_uploader("Upload your 'Table of Dice Rolls' file", type=["xlsx", "xls"])
     
     if uploaded_file is not None:
@@ -106,36 +105,50 @@ else:
             st.sidebar.error(f"Error parsing file: {e}. Ensure 'Day' is the first column.")
             
     if not is_base_run and uploaded_df is not None:
-        st.sidebar.markdown("---")
-        st.sidebar.header("🚀 Scenario Improvements")
         st.sidebar.info(f"Modifying Scenario #{history_count}. Add capacity boosts to optimize your baseline flow!")
-        
         temp_members = [chr(64 + i) for i in range(1, num_members + 1)]
         for m in temp_members:
             dice_boosts[m] = st.sidebar.slider(f"Capacity Boost for Station {m}", 0, 10, 0)
     elif is_base_run and uploaded_df is not None:
-        st.sidebar.markdown("---")
         st.sidebar.warning("🔒 Base Run Active: Dice modification parameters are locked to imported values.")
 
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
-st.sidebar.header("WIP Initialization")
+# SECTION 2: WIP INITIALIZATION
+st.sidebar.markdown("---")
+st.sidebar.header("📦 WIP Initialization")
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
-# Clear / Logout handlers
+# SECTION 3: SIMULATION EXECUTION (MAIN BUTTON PLACE)
 st.sidebar.markdown("---")
-if st.sidebar.button("🗑️ Clear Whole History"):
+st.sidebar.header("🚀 Action Console")
+run_sim_clicked = st.sidebar.button("▶ Run & Save Simulation", use_container_width=True)
+
+# SECTION 4: DATA MAINTENANCE
+st.sidebar.markdown("---")
+st.sidebar.header("🧹 Data Maintenance")
+clear_history_clicked = st.sidebar.button("🗑️ Clear Whole History", use_container_width=True)
+
+# SECTION 5: ACCOUNT PORTAL
+st.sidebar.markdown("---")
+st.sidebar.header("🚪 Session Management")
+logout_clicked = st.sidebar.button("🚪 Logout & Exit", use_container_width=True)
+
+
+# --- Handle Clear and Logout Button Operations ---
+if clear_history_clicked:
     user_record["history"] = []
     user_record["stations"] = []
     st.session_state.active_results = None
     st.rerun()
 
-if st.sidebar.button("🚪 Logout & Exit"):
+if logout_clicked:
     st.session_state.authenticated_user = None
     st.session_state.active_results = None
     st.rerun()
+
 
 # --- Utility Functions ---
 def calculate_entropy(values):
@@ -144,9 +157,9 @@ def calculate_entropy(values):
     p = counts / counts.sum()
     return -np.sum(p * np.log2(p))
 
+
 # --- Simulation Processing Engine ---
-# Executed only when button clicked, then saved permanently to session memory
-if st.sidebar.button("▶ Run & Save Simulation"):
+if run_sim_clicked:
     if capacity_mode == "Import Excel File" and uploaded_df is None:
         st.sidebar.error("Please upload a valid Excel file first!")
     else:
@@ -293,7 +306,7 @@ if st.sidebar.button("▶ Run & Save Simulation"):
                 "Entropy Spread σH (Monthly)": spread_h_monthly, "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
             })
 
-        # Save all UI layout structures inside session state memory to survive re-renders!
+        # Save all UI layouts to memory
         st.session_state.active_results = {
             "scen_label": scen_label,
             "df_dice": df_dice,
@@ -311,7 +324,6 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Perf
 with tab1:
     st.title("🚀 Live Operations Console")
     
-    # Read calculations directly from memory storage
     if st.session_state.active_results is not None:
         res = st.session_state.active_results
 
