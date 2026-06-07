@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS Styling for Premium Theme & Custom Component Borders ---
+# --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
     <style>
     .main .block-container { padding-top: 2rem; }
@@ -19,16 +19,6 @@ st.markdown("""
     div[data-testid="stMetricLabel"] { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
     .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
     .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-    
-    /* Clean, defined box wrapping entirely around each individual station block */
-    .station-box {
-        border: 1px solid #CBD5E1;
-        background-color: #F8FAFC;
-        padding: 16px;
-        border-radius: 8px;
-        margin-top: 12px;
-        margin-bottom: 12px;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -134,17 +124,11 @@ if capacity_mode == "Random Generation":
             choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
-    st.sidebar.markdown("<br>", unsafe_allow_html=True)
     for m in members_list[:7]: # Default to 7 workstations
-        # Open the perimeter card wrapper around the whole station block
-        st.sidebar.markdown(f'<div class="station-box">', unsafe_allow_html=True)
         if m == 'A' and activate_choke_release and choke_target_station:
-            st.sidebar.markdown(f"**Workstation {m} Configuration**")
-            st.sidebar.caption("Operational Range: *Mirrored from Target*")
-        else:
-            dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
-        # Safely seal the perimeter border wrapper around the specific station contents
-        st.sidebar.markdown('</div>', unsafe_allow_html=True)
+            st.sidebar.caption("Station A Range: *Mirrored from Target*")
+            continue
+        dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500)
     num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=7)
@@ -182,17 +166,11 @@ else:
             if activate_choke_release:
                 choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in temp_members if m != 'A'])
             
-            st.sidebar.markdown("<br>", unsafe_allow_html=True)
             for m in temp_members:
-                # Open the structural container border around the importing scenario stations
-                st.sidebar.markdown(f'<div class="station-box">', unsafe_allow_html=True)
                 if m == 'A' and activate_choke_release:
-                    st.sidebar.markdown(f"**Workstation {m} Configuration**")
-                    st.sidebar.caption("Operational Range: *Mirrored from Target File Column*")
-                else:
-                    dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
-                # Close the station perimeter boundary
-                st.sidebar.markdown('</div>', unsafe_allow_html=True)
+                    st.sidebar.caption("Station A Range: *Mirrored from Target File Column*")
+                    continue
+                dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
 
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
@@ -203,7 +181,7 @@ st.sidebar.markdown("---")
 st.sidebar.header("📦 Line-Stock WIP Initialization")
 initial_wip = {k: st.sidebar.number_input(f"Initial Buffer {k.replace('WIP_', '')}", min_value=0, value=4) for k in wip_keys}
 
-# SECTION 3: SIMULATION EXECUTION
+# SECTION 3: SIMULATION EXECUTION (MAIN BUTTON PLACE)
 st.sidebar.markdown("---")
 st.sidebar.header("🚀 Execution Terminal")
 run_sim_clicked = st.sidebar.button("▶ Compile & Execute Trial", use_container_width=True, type="primary")
@@ -245,22 +223,30 @@ if run_sim_clicked:
     if "Import" in capacity_mode and uploaded_df is None:
         st.sidebar.error("Execution Fault: Please upload an analytical capacity CSV/Excel matrix first!")
     else:
+        # Sync configurations if Choke release is chosen
         if activate_choke_release and choke_target_station:
             dice_configs['A'] = dice_configs[choke_target_station]
 
+        # 1. Capacity Generation/Loading
         if capacity_mode == "Random Generation":
             np.random.seed(st.session_state.sim_seed)
             dice_rolls = {}
+            
+            # Populate ranges for all stations first
             for m in members:
                 if m == 'A' and activate_choke_release and choke_target_station:
-                    continue
+                    continue # Will copy after loop
                 dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
             
+            # Apply dynamic Choke Release mirroring if active
             if activate_choke_release and choke_target_station:
                 dice_rolls['A'] = list(dice_rolls[choke_target_station])
                 
             df_dice = pd.DataFrame(dice_rolls)
+            
+            # CRITICAL FIX: Force alignment back to standard structural ordering
             df_dice = df_dice.reindex(columns=members)
+            
             df_dice.index = range(1, num_days + 1)
             df_dice.index.name = "Day"
         else:
@@ -272,7 +258,7 @@ if run_sim_clicked:
                 np.random.seed(42) 
                 for m in members:
                     if m == 'A' and activate_choke_release:
-                        continue
+                        continue # Mirror file column values instead
                     low, high = dice_configs[m]
                     if (low != 1) or (high != 6):
                         df_dice[m] = [np.random.randint(low, high + 1) for _ in range(num_days)]
@@ -280,8 +266,10 @@ if run_sim_clicked:
                 if activate_choke_release and choke_target_station:
                     df_dice['A'] = df_dice[choke_target_station].copy()
                     
+            # Enforce structural column tracking layout
             df_dice = df_dice.reindex(columns=members)
 
+        # --- PROCESS LOGGING CONTEXTS (Implicit Daily Run) ---
         applied_configs_desc = []
         for m in members:
             if m == 'A' and activate_choke_release:
@@ -291,6 +279,7 @@ if run_sim_clicked:
 
         dice_info = " | ".join(applied_configs_desc)
 
+        # 2. Simulation Operations Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
         total_fg = 0
@@ -338,8 +327,12 @@ if run_sim_clicked:
                 "Day Wise Total FG": daily_fg_out
             })
 
+        # Process Extra Performance Tables Matrix Data
         df_pennies = pd.DataFrame(pennies_movement_data)
+        
+        # Keep Station alignment chronological across output views
         df_pennies = df_pennies.reindex(columns=members)
+        
         df_pennies.index = range(1, num_days + 1)
         df_pennies.index.name = "Day"
         total_output_row = df_pennies.sum().to_frame().T
@@ -354,6 +347,7 @@ if run_sim_clicked:
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         final_wip_inventory = sum(wip_buffers.values())
 
+        # Determine structural logging contexts
         scen_label = "Base-Run" if is_base_run else f"Scenario #{history_count}"
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}= {initial_wip[k]}" for k in wip_keys])
         run_description = f"Days={num_days} | Mode={capacity_mode} | WIP: {wip_summary} | Configs: {dice_info}"
@@ -362,6 +356,7 @@ if run_sim_clicked:
         avg_total_wip_per_day = sum_total_wip / num_days
         calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
 
+        # Append to historical datastores
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": run_description,
@@ -377,7 +372,7 @@ if run_sim_clicked:
         days_per_month = 20
         num_months = int(np.ceil(num_days / days_per_month))
         for m in members:
-            station_label = m  
+            station_label = m  # MANDATED: Simplified identifier format
             low, high = dice_configs.get(m, (1, 6))
             d_range = f"{low}-{high}"
             if m == 'A' and activate_choke_release:
@@ -408,6 +403,7 @@ if run_sim_clicked:
                 "Entropy Spread σH (Monthly)": spread_h_monthly, "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
             })
 
+        # Save all UI layouts to memory
         st.session_state.active_results = {
             "scen_label": scen_label,
             "df_dice": df_dice,
@@ -429,6 +425,18 @@ with tab1:
     if st.session_state.active_results is not None:
         res = st.session_state.active_results
 
+        # Metric Presentation Section
+        st.markdown(f"### 🏁 Executive Target Summary ({res['scen_label']})")
+        m_col1, m_col2, m_col3 = st.columns(3)
+        with m_col1:
+            st.metric(label="Total Throughput Yield", value=f"{int(res['total_fg'])} units", delta=None)
+        with m_col2:
+            st.metric(label="System Throughput Rate (TR)", value=f"{round(res['total_fg'] / res['num_days'], 2)} units/day", delta=None)
+        with m_col3:
+            st.metric(label="Terminating WIP Stockpile", value=f"{int(res['final_wip_inventory'])} units", delta=None)
+        
+        st.markdown("<hr>", unsafe_allow_html=True)
+
         st.subheader("🎲 Table of Dice Rolls (Capacity Applied)")
         st.dataframe(res["df_dice"], use_container_width=True)
 
@@ -437,24 +445,11 @@ with tab1:
 
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(res["results_df"], use_container_width=True)
-        
-        st.markdown("<hr>", unsafe_allow_html=True)
-        
-        # Target Metric Summary perfectly aligned at the bottom of the page
-        st.markdown(f"### 🏁 Executive Target Summary ({res['scen_label']})")
-        m_col1, m_col2, m_col3 = st.columns(3)
-        with m_col1:
-            st.metric(label="Total Throughput Yield", value=f"{int(res['total_fg'])} units")
-        with m_col2:
-            st.metric(label="System Throughput Rate (TR)", value=f"{round(res['total_fg'] / res['num_days'], 2)} units/day")
-        with m_col3:
-            st.metric(label="Terminating WIP Stockpile", value=f"{int(res['final_wip_inventory'])} units")
-            
     else:
         st.markdown("""
             <div style="background-color: #EFF6FF; border-left: 5px solid #3B82F6; padding: 1.5rem; border-radius: 4px; margin-top: 2rem;">
                 <h4 style="color: #1E40AF; margin-top:0;">💡 Terminal Ready for Simulation Run</h4>
-                <p style="color: #1E3A8A; margin-bottom:0;">Configure initial parameters, distribution capacity limits, and buffer sizing targets inside the executive sidebar panel. Click <strong>Compile & Execute Trial</strong> to plot current platform analytical data streams.</p>
+                <p style="color: #1E3A8A; margin-bottom:0;">Configure initial parameters, distribution capacity limits, and buffer sizing targets inside the executive sidebar panel. Click <strong>Run & Save Simulation</strong> to plot current platform analytical data streams.</p>
             </div>
         """, unsafe_allow_html=True)
 
@@ -484,6 +479,7 @@ with tab2:
         
         if rows_b:
             df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
+            # Table B renders clean simplified station identifiers dynamically as headers (A, B, C...)
             st.table(df_table_b)
             
         st.markdown("---")
