@@ -73,7 +73,7 @@ uploaded_df = None
 num_days = 1500
 num_members = 7
 dice_configs = {}
-station_frequencies = {} # Dictionary tracking day cadences
+station_frequencies = {} 
 
 if capacity_mode == "Random Generation":
     if 'sim_seed' not in st.session_state:
@@ -88,15 +88,19 @@ if capacity_mode == "Random Generation":
     
     members_list = [chr(64 + i) for i in range(1, 9)] 
     
-    # Random Mode: Setup base layout configs
     for m in members_list:
         dice_configs[m] = st.sidebar.slider(f"Dice Range for {m}", 1, 20, (1, 6))
         
-        # Frequency Control Added for Random Scenarios
+        # UPGRADED: Expanded selectbox options list up to 30 days for Random selection layout
         if not is_base_run:
-            station_frequencies[m] = st.sidebar.selectbox(f"Run Frequency for {m}", [1, 2, 3, 4, 5], index=0, format_func=lambda x: f"Every Day" if x==1 else f"Once in {x} Days")
+            station_frequencies[m] = st.sidebar.selectbox(
+                f"Run Frequency for {m}", 
+                list(range(1, 31)), 
+                index=0, 
+                format_func=lambda x: "Every Day" if x == 1 else f"Once in {x} Days"
+            )
         else:
-            station_frequencies[m] = 1 # Base run always runs daily
+            station_frequencies[m] = 1 
 
     num_days = st.sidebar.number_input("Days", min_value=1, value=1500, max_value=1500)
     num_members = st.sidebar.number_input("Workstations", min_value=2, value=7, max_value=7)
@@ -129,14 +133,20 @@ else:
         else:
             st.sidebar.markdown("---")
             st.sidebar.header("🚀 Scenario Improvements")
-            st.sidebar.info(f"Modifying Scenario #{history_count}. Adjust your dice ranges and running frequency below:")
+            st.sidebar.info(f"Modifying Scenario #{history_count}. Set custom parameters below:")
             
             for m in temp_members:
                 col1, col2 = st.sidebar.columns(2)
                 with col1:
                     dice_configs[m] = st.slider(f"Range {m}", 1, 20, (1, 6))
                 with col2:
-                    station_frequencies[m] = st.selectbox(f"Freq {m}", [1, 2, 3, 4, 5], index=0, format_func=lambda x: f"Daily" if x==1 else f"1 in {x} Days")
+                    # UPGRADED: Expanded choice matrix list to select dynamic intervals up to 30 days
+                    station_frequencies[m] = st.selectbox(
+                        f"Freq {m}", 
+                        list(range(1, 31)), 
+                        index=0, 
+                        format_func=lambda x: "Daily" if x == 1 else f"1 in {x} Days"
+                    )
 
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
@@ -213,7 +223,6 @@ if run_sim_clicked:
         for m in members:
             freq = station_frequencies.get(m, 1)
             if freq > 1:
-                # Set capacity to 0 on non-running days based on remainder logic
                 for day in df_dice.index:
                     if (day - 1) % freq != 0:
                         df_dice.at[day, m] = 0
