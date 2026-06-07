@@ -516,5 +516,3 @@ with tab3:
             
             st.markdown("#### Entropy Spread System Metric ($\sigma H$)")
             st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
-
-```
