@@ -12,58 +12,79 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS Styling for Premium Executive Simulation Theme ---
+# --- Custom Interactive CSS Styling ---
 st.markdown("""
 <style>
     /* Main app canvas background color */
     .stApp {
-        background-color: #fcfcfc;
+        background-color: #FAF9F6; /* Warm alabaster */
     }
     
-    /* Global Sidebar Styling Refinements */
-    section[data-testid="stSidebar"] {
-        background-color: #f1f3f5 !important;
-        border-right: 1px solid #e9ecef;
-    }
-    
-    /* Premium Metric Card Styling Overrides */
+    /* Interactive Metric Card Animation */
     div[data-testid="stMetricValue"] {
         font-size: 2.2rem;
         font-weight: 800;
-        color: #8A1538; /* Core Crimson Anchor */
+        color: #8A1538; /* Core Crimson */
         font-family: 'Georgia', serif;
+        transition: color 0.3s ease;
     }
+    
+    /* Target metric containers for a beautiful interactive lift effect */
+    div[data-testid="metric-container"] {
+        background-color: #ffffff;
+        padding: 15px 20px;
+        border-radius: 8px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+    
+    /* Hover micro-animation for metrics */
+    div[data-testid="metric-container"]:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 20px rgba(138, 21, 56, 0.12);
+        border-color: #8A1538;
+    }
+    
     div[data-testid="stMetricLabel"] {
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.8px;
-        color: #2D3748; /* Deep Charcoal */
+        color: #4A5568;
         font-size: 0.85rem;
     }
     
-    /* Tab Styling Adjustments */
+    /* Interactive Smooth-Transition Tabs */
     .stTabs [data-baseweb="tab"] {
         font-size: 1.1rem;
         font-weight: 700;
-        padding-top: 12px;
-        padding-bottom: 12px;
-        color: #4A5568;
+        padding: 12px 20px;
+        color: #718096;
+        transition: all 0.2s ease-in-out;
     }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #8A1538;
+        background-color: rgba(138, 21, 56, 0.04);
+        border-radius: 4px 4px 0 0;
+    }
+    
     .stTabs [aria-selected="true"] {
         color: #8A1538 !important;
-        border-bottom-color: #8A1538 !important;
+        border-bottom: 3px solid #8A1538 !important;
     }
     
     /* Classy Alert / Info Banner Adjustments */
     div[data-testid="stNotification"] {
         border-left: 5px solid #8A1538 !important;
-        background-color: #fdf2f4;
+        background-color: #FFF5F5;
+        border-radius: 4px;
     }
     
-    /* Interactive Button Styling Profiles */
-    div.stButton > button:first-child {
-        border-radius: 6px;
-        font-weight: 600;
+    /* Premium Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #F7FAFC !important;
+        border-right: 1px solid #E2E8F0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -426,14 +447,11 @@ with tab1:
         
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
-            with st.container(border=True):
-                st.metric("Total System Throughput", f"{int(res['total_fg'])} units")
+            st.metric("Total System Throughput", f"{int(res['total_fg'])} units")
         with col_m2:
-            with st.container(border=True):
-                st.metric("Yield Throughput Rate (TR)", f"{round(res['total_fg'] / res['num_days'], 2)} u/day")
+            st.metric("Yield Throughput Rate (TR)", f"{round(res['total_fg'] / res['num_days'], 2)} u/day")
         with col_m3:
-            with st.container(border=True):
-                st.metric("Ending WIP Accumulation", f"{int(res['final_wip_inventory'])} units")
+            st.metric("Ending WIP Accumulation", f"{int(res['final_wip_inventory'])} units")
     else:
         st.info("💡 Adjust your factory configurations in the sidebar and click 'Execute & Save Run' to initialize the production studio.")
 
