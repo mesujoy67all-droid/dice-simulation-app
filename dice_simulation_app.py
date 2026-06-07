@@ -95,7 +95,6 @@ if capacity_mode == "Random Generation":
         st.sidebar.subheader("🚨 Control Room")
         activate_choke_release = st.sidebar.checkbox("🔓 Activate 'Release the Choke' for Station A", value=False)
         if activate_choke_release:
-            # Let Station A replicate any downstream station (B through G/H)
             choke_target_station = st.sidebar.selectbox("Match Station A's production to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
@@ -218,6 +217,10 @@ if run_sim_clicked:
                 dice_rolls['A'] = list(dice_rolls[choke_target_station])
                 
             df_dice = pd.DataFrame(dice_rolls)
+            
+            # CRITICAL FIX: Force alignment back to standard structural ordering
+            df_dice = df_dice.reindex(columns=members)
+            
             df_dice.index = range(1, num_days + 1)
             df_dice.index.name = "Day"
         else:
@@ -236,6 +239,9 @@ if run_sim_clicked:
                 
                 if activate_choke_release and choke_target_station:
                     df_dice['A'] = df_dice[choke_target_station].copy()
+                    
+            # Enforce structural column tracking layout
+            df_dice = df_dice.reindex(columns=members)
 
         # --- PROCESS LOGGING CONTEXTS (Implicit Daily Run) ---
         applied_configs_desc = []
@@ -297,6 +303,10 @@ if run_sim_clicked:
 
         # Process Extra Performance Tables Matrix Data
         df_pennies = pd.DataFrame(pennies_movement_data)
+        
+        # Keep Station alignment chronological across output views
+        df_pennies = df_pennies.reindex(columns=members)
+        
         df_pennies.index = range(1, num_days + 1)
         df_pennies.index.name = "Day"
         total_output_row = df_pennies.sum().to_frame().T
