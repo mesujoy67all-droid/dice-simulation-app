@@ -72,7 +72,6 @@ capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generat
 uploaded_df = None
 num_days = 1500
 num_members = 7
-dice_boosts = {}
 dice_configs = {}
 
 if capacity_mode == "Random Generation":
@@ -97,28 +96,35 @@ else:
     
     if uploaded_file is not None:
         try:
-            # Flexible reading for Excel or CSV
             if uploaded_file.name.endswith('.csv'):
                 uploaded_df = pd.read_csv(uploaded_file, index_col=0)
             else:
                 uploaded_df = pd.read_excel(uploaded_file, index_col=0)
             
-            # Clean dataframe values to make sure they are integers
             uploaded_df = uploaded_df.apply(pd.to_numeric, errors='coerce').fillna(0).astype(int)
-            
             num_days = len(uploaded_df)
             num_members = len(uploaded_df.columns)
             st.sidebar.success(f"📂 Loaded Baseline: {num_days} Days, {num_members} Stations.")
         except Exception as e:
             st.sidebar.error(f"Error parsing file: {e}. Ensure day counts are structural records.")
             
-    if not is_base_run and uploaded_df is not None:
-        st.sidebar.info(f"Modifying Scenario #{history_count}. Add capacity boosts to optimize your baseline flow!")
+    # --- FIXED: SIMILAR SLIDERS GENERATED FOR THE IMPORT SECTION ---
+    if uploaded_df is not None:
         temp_members = [chr(64 + i) for i in range(1, num_members + 1)]
-        for m in temp_members:
-            dice_boosts[m] = st.sidebar.slider(f"Capacity Boost for Station {m}", 0, 10, 0)
-    elif is_base_run and uploaded_df is not None:
-        st.sidebar.warning("🔒 Base Run Active: Dice modification parameters are locked to imported values.")
+        
+        if is_base_run:
+            st.sidebar.warning("🔒 Base Run Active: Custom dice modifiers are locked.")
+            # Set default standard 1 to 6 ranges for base run recording reference
+            for m in temp_members:
+                dice_configs[m] = (1, 6)
+        else:
+            st.sidebar.markdown("---")
+            st.sidebar.header("🚀 Scenario Improvements")
+            st.sidebar.info(f"Modifying Scenario #{history_count}. Adjust your explicit active dice ranges for each station below:")
+            
+            # Create matching dual sliders for the import scenario matching Random Configuration style
+            for m in temp_members:
+                dice_configs[m] = st.sidebar.slider(f"Adjust Dice Range for Station {m}", 1, 20, (1, 6))
 
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
@@ -180,20 +186,25 @@ if run_sim_clicked:
             df_dice.index.name = "Day"
             dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         else:
+            # Import mode processing engine layout
             df_dice = uploaded_df.copy()
             df_dice.columns = members
             df_dice.index.name = "Day"
             
-            if not is_base_run and dice_boosts:
-                applied_boosts_desc = []
+            if not is_base_run and dice_configs:
+                applied_configs_desc = []
+                # Regenerate controlled variance on top of baseline scenario structure
+                np.random.seed(42)  # Maintain stable pseudo-random variations across matching runs
                 for m in members:
-                    boost = dice_boosts.get(m, 0)
-                    if boost > 0:
-                        df_dice[m] = df_dice[m] + boost
-                        applied_boosts_desc.append(f"{m}(+{boost})")
-                dice_info = f"Imported Data + Modifiers: {', '.join(applied_boosts_desc)}" if applied_boosts_desc else "Imported Data (No modifiers changed)"
+                    low, high = dice_configs[m]
+                    # If customized by user away from standard (1,6), apply the range shift dynamically
+                    if (low != 1) or (high != 6):
+                        df_dice[m] = [np.random.randint(low, high + 1) for _ in range(num_days)]
+                        applied_configs_desc.append(f"{m}({low}-{high})")
+                
+                dice_info = f"Imported Data + Adjusted Ranges: {', '.join(applied_configs_desc)}" if applied_configs_desc else "Imported Data (Default standard ranges)"
             else:
-                dice_info = "Imported Base Data Values (Locked)"
+                dice_info = "Imported Base Data Values (Locked to Original Layout)"
 
         # 2. Simulation Operations Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
@@ -285,10 +296,9 @@ if run_sim_clicked:
         num_months = int(np.ceil(num_days / days_per_month))
         for m in members:
             station_label = f"Station {m}"
-            if "Import" in capacity_mode:
-                d_range = f"Imported Base" if is_base_run else f"Imported (+{dice_boosts.get(m, 0)})"
-            else:
-                d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
+            low, high = dice_configs.get(m, (1, 6))
+            d_range = f"{low}-{high}"
+            
             tot_out = sum(st_output[m])
             avg_wip_val = 0.0
             if m != 'A':
