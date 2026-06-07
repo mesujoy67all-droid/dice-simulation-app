@@ -6,41 +6,64 @@ import io
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Dice Simulation Platform", 
+    page_title="Executive Simulation Platform", 
     page_icon="🎲",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS Styling for Modern Gamified Feel ---
+# --- Custom CSS Styling for Premium Executive Simulation Theme ---
 st.markdown("""
 <style>
-    /* Main overall background adjustments */
+    /* Main app canvas background color */
     .stApp {
-        background-color: #f8f9fa;
+        background-color: #fcfcfc;
     }
-    /* Metric Card Styling customization overrides */
+    
+    /* Global Sidebar Styling Refinements */
+    section[data-testid="stSidebar"] {
+        background-color: #f1f3f5 !important;
+        border-right: 1px solid #e9ecef;
+    }
+    
+    /* Premium Metric Card Styling Overrides */
     div[data-testid="stMetricValue"] {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #1E3A8A;
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: #8A1538; /* Core Crimson Anchor */
+        font-family: 'Georgia', serif;
     }
     div[data-testid="stMetricLabel"] {
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #4B5563;
+        letter-spacing: 0.8px;
+        color: #2D3748; /* Deep Charcoal */
+        font-size: 0.85rem;
     }
-    /* Tab Styling adjustments */
+    
+    /* Tab Styling Adjustments */
     .stTabs [data-baseweb="tab"] {
         font-size: 1.1rem;
-        font-weight: 600;
-        padding-top: 10px;
-        padding-bottom: 10px;
+        font-weight: 700;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        color: #4A5568;
     }
     .stTabs [aria-selected="true"] {
-        color: #1E3A8A !important;
-        border-bottom-color: #1E3A8A !important;
+        color: #8A1538 !important;
+        border-bottom-color: #8A1538 !important;
+    }
+    
+    /* Classy Alert / Info Banner Adjustments */
+    div[data-testid="stNotification"] {
+        border-left: 5px solid #8A1538 !important;
+        background-color: #fdf2f4;
+    }
+    
+    /* Interactive Button Styling Profiles */
+    div.stButton > button:first-child {
+        border-radius: 6px;
+        font-weight: 600;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -58,8 +81,8 @@ if 'active_results' not in st.session_state:
 
 # --- Authentication Gateway ---
 def auth_gateway():
-    st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🎲 Dice Simulation Game</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #6B7280;'>🎲 Dice Simulation Game</p>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #8A1538; font-family: Georgia, serif; font-weight: 800;'>🎲 Dice Simulation Suite</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #4A5568; font-size: 1.1rem;'>Strategic Operations & Risk Management Lab</p>", unsafe_allow_html=True)
     
     col_l, col_c, col_r = st.columns([1, 1.5, 1])
     with col_c:
@@ -71,7 +94,7 @@ def auth_gateway():
             
             if auth_mode == "Signup":
                 st.caption("💡 Your User ID must be unique. You can only sign up once.")
-                if st.button("🚀 Create Student Account", use_container_width=True):
+                if st.button("🚀 Create Simulation Profile", use_container_width=True):
                     if user_id in st.session_state.user_db:
                         st.error(f"User ID '{user_id}' is already taken.")
                     elif user_id and pwd:
@@ -103,7 +126,7 @@ history_count = len(user_record["history"])
 is_base_run = (history_count == 0)
 
 # --- Sidebar Layout Configuration ---
-st.sidebar.markdown(f"### ⚙️ Factory Controls\n**Active Engineer:** `{current_user}`")
+st.sidebar.markdown(f"### ⚙️ Engine Controls\n**Lead Engineer:** `{current_user}`")
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔌 Mode Settings")
@@ -201,7 +224,7 @@ initial_wip = {k: st.sidebar.number_input(f"Initial Buffer {k.replace('WIP_', ''
 st.sidebar.markdown("---")
 run_sim_clicked = st.sidebar.button("▶️ Execute & Save Run", type="primary", use_container_width=True)
 clear_history_clicked = st.sidebar.button("🗑️ Reset All Scenarios", use_container_width=True)
-logout_clicked = st.sidebar.button("🚪 Exit Simulation Lab", use_container_width=True)
+logout_clicked = st.sidebar.button("🚪 Exit Simulation Suite", use_container_width=True)
 
 if clear_history_clicked:
     user_record["history"] = []
@@ -382,14 +405,13 @@ if run_sim_clicked:
 tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Diagnostics", "📖 Concept & Logic Laboratory"])
 
 with tab1:
-    st.markdown("<h2 style='color: #1E3A8A;'>🏭 Live Operations & Flow Visualization</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #8A1538; font-family: Georgia, serif;'>🏭 Live Operations & Flow Visualization</h2>", unsafe_allow_html=True)
     
     if st.session_state.active_results is not None:
         res = st.session_state.active_results
         
         st.markdown(f"### Current Execution State: **{res['scen_label']}**")
         
-        # Repositioned Section: Granular Execution Logs placed right under the main header status line
         st.markdown("### 🔍 Granular Execution Logs")
         with st.expander("🎲 Capacity Generation Profile Data Matrix (Dice Outputs)", expanded=False):
             st.dataframe(res["df_dice"], use_container_width=True)
@@ -402,7 +424,6 @@ with tab1:
             
         st.markdown("---")
         
-        # Summary metrics section follows lower down the line
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
             with st.container(border=True):
@@ -417,7 +438,7 @@ with tab1:
         st.info("💡 Adjust your factory configurations in the sidebar and click 'Execute & Save Run' to initialize the production studio.")
 
 with tab2:
-    st.markdown("<h2 style='color: #1E3A8A;'>📊 Cross-Scenario Strategic Performance Insights</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #8A1538; font-family: Georgia, serif;'>📊 Cross-Scenario Strategic Performance Insights</h2>", unsafe_allow_html=True)
     
     if user_record["history"]:
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
@@ -490,7 +511,7 @@ with tab2:
         st.info("No run logs found. Please run a simulation on the Operations Console first.")
 
 with tab3:
-    st.markdown("<h2 style='color: #1E3A8A;'>📖 Foundational Engineering Methodology</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #8A1538; font-family: Georgia, serif;'>📖 Foundational Engineering Methodology</h2>", unsafe_allow_html=True)
     st.markdown("""
     This simulator models the classic **Theory of Constraints (TOC)** production engine game. It demonstrates how system variance and balanced dependencies create massive bottlenecks.
     """)
