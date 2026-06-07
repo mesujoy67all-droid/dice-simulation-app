@@ -74,6 +74,8 @@ uploaded_df = None
 num_days = 1500
 num_members = 7
 dice_configs = {}
+choke_target_station = None
+activate_choke_release = False
 
 if capacity_mode == "Random Generation":
     if 'sim_seed' not in st.session_state:
@@ -86,9 +88,21 @@ if capacity_mode == "Random Generation":
 
     st.sidebar.caption(f"Current Seed: {st.session_state.sim_seed}")
     
-    members_list = [chr(64 + i) for i in range(1, 8)] # Dynamic range up to G (7 workstations)
+    members_list = [chr(64 + i) for i in range(1, 9)] 
     
-    for m in members_list:
+    # "Release the Choke" Configuration for Scenario Runs
+    if not is_base_run:
+        st.sidebar.subheader("🚨 Control Room")
+        activate_choke_release = st.sidebar.checkbox("🔓 Activate 'Release the Choke' for Station A", value=False)
+        if activate_choke_release:
+            # Let Station A replicate any downstream station (B through G/H)
+            choke_target_station = st.sidebar.selectbox("Match Station A's production to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
+            st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
+
+    for m in members_list[:7]: # Default to 7 workstations
+        if m == 'A' and activate_choke_release and choke_target_station:
+            st.sidebar.caption("Station A Range: *Mirrored from Target*")
+            continue
         dice_configs[m] = st.sidebar.slider(f"Dice Range for {m}", 1, 20, (1, 6))
 
     num_days = st.sidebar.number_input("Days", min_value=1, value=1500, max_value=1500)
@@ -123,33 +137,19 @@ else:
             st.sidebar.header("🚀 Scenario Improvements")
             st.sidebar.info(f"Modifying Scenario #{history_count}. Set custom parameters below:")
             
+            activate_choke_release = st.sidebar.checkbox("🔓 Activate 'Release the Choke' for Station A", value=False)
+            if activate_choke_release:
+                choke_target_station = st.sidebar.selectbox("Match Station A's capacity to:", [m for m in temp_members if m != 'A'])
+            
             for m in temp_members:
+                if m == 'A' and activate_choke_release:
+                    st.sidebar.caption("Station A Range: *Mirrored from Target File Column*")
+                    continue
                 dice_configs[m] = st.sidebar.slider(f"Range {m}", 1, 20, (1, 6))
 
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
-
-# SECTION 1B: CHOKE RELEASE (CONSTRAINED INPUT) OPTION
-st.sidebar.markdown("---")
-st.sidebar.header("🛑 Choke Release Configuration")
-
-choke_enabled = False
-choke_target_station = None
-
-if is_base_run:
-    st.sidebar.info("💡 Run the baseline scenario first to identify your bottleneck station.")
-else:
-    choke_enabled = st.sidebar.toggle("🔗 Enable Choke Release (Throttle Station A)", value=False)
-    if choke_enabled:
-        # Exclude Station A since it can't choke itself
-        potential_bottlenecks = [m for m in members if m != 'A']
-        choke_target_station = st.sidebar.selectbox(
-            "Select Target Bottleneck Station to Synchronize Station A with:",
-            options=potential_bottlenecks,
-            help="Station A's daily roll will be capped by the selected station's capacity roll for that day."
-        )
-        st.sidebar.success(r"🎯 Station A is now synchronized with Station " + choke_target_station)
 
 # SECTION 2: WIP INITIALIZATION
 st.sidebar.markdown("---")
@@ -198,10 +198,25 @@ if run_sim_clicked:
     if "Import" in capacity_mode and uploaded_df is None:
         st.sidebar.error("Please upload a valid Excel or CSV file first!")
     else:
+        # Sync configurations if Choke release is chosen
+        if activate_choke_release and choke_target_station:
+            dice_configs['A'] = dice_configs[choke_target_station]
+
         # 1. Capacity Generation/Loading
         if capacity_mode == "Random Generation":
             np.random.seed(st.session_state.sim_seed)
-            dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
+            dice_rolls = {}
+            
+            # Populate ranges for all stations first
+            for m in members:
+                if m == 'A' and activate_choke_release and choke_target_station:
+                    continue # Will copy after loop
+                dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
+            
+            # Apply dynamic Choke Release mirroring if active
+            if activate_choke_release and choke_target_station:
+                dice_rolls['A'] = list(dice_rolls[choke_target_station])
+                
             df_dice = pd.DataFrame(dice_rolls)
             df_dice.index = range(1, num_days + 1)
             df_dice.index.name = "Day"
@@ -213,18 +228,24 @@ if run_sim_clicked:
             if not is_base_run and dice_configs:
                 np.random.seed(42) 
                 for m in members:
+                    if m == 'A' and activate_choke_release:
+                        continue # Mirror file column values instead
                     low, high = dice_configs[m]
                     if (low != 1) or (high != 6):
                         df_dice[m] = [np.random.randint(low, high + 1) for _ in range(num_days)]
+                
+                if activate_choke_release and choke_target_station:
+                    df_dice['A'] = df_dice[choke_target_station].copy()
 
         # --- PROCESS LOGGING CONTEXTS (Implicit Daily Run) ---
         applied_configs_desc = []
         for m in members:
-            applied_configs_desc.append(f"{m}(Range:{dice_configs[m][0]}-{dice_configs[m][1]})")
+            if m == 'A' and activate_choke_release:
+                applied_configs_desc.append(f"A(Choke-Released to {choke_target_station})")
+            else:
+                applied_configs_desc.append(f"{m}(Range:{dice_configs[m][0]}-{dice_configs[m][1]})")
 
         dice_info = " | ".join(applied_configs_desc)
-        if choke_enabled and choke_target_station:
-            dice_info += f" | 🛑 Choke: A constrained by {choke_target_station}"
 
         # 2. Simulation Operations Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
@@ -235,13 +256,7 @@ if run_sim_clicked:
         pennies_movement_data = defaultdict(list)
 
         for day in df_dice.index:
-            day_rolls = df_dice.loc[day].to_dict()
-            
-            # --- APPLY CHOKE LOGIC TO STATION A ---
-            if choke_enabled and choke_target_station:
-                # Station A cannot produce more than what the targeted bottleneck is capable of rolling today
-                day_rolls['A'] = min(day_rolls['A'], day_rolls[choke_target_station])
-            
+            day_rolls = df_dice.loc[day]
             daily_fg_out = 0
             
             for i, m in enumerate(members):
@@ -298,10 +313,7 @@ if run_sim_clicked:
 
         # Determine structural logging contexts
         scen_label = "Base-Run" if is_base_run else f"Scenario #{history_count}"
-        if choke_enabled and choke_target_station:
-            scen_label += f" (Choke-{choke_target_station})"
-            
-        wip_summary = ", ".join([f"{k.replace('WIP_', '')}={initial_wip[k]}" for k in wip_keys])
+        wip_summary = ", ".join([f"{k.replace('WIP_', '')}= {initial_wip[k]}" for k in wip_keys])
         run_description = f"Days={num_days} | Mode={capacity_mode} | WIP: {wip_summary} | Configs: {dice_info}"
 
         avg_throughput_rate = total_fg / num_days
@@ -327,7 +339,9 @@ if run_sim_clicked:
             station_label = f"Station {m}"
             low, high = dice_configs.get(m, (1, 6))
             d_range = f"{low}-{high}"
-            
+            if m == 'A' and activate_choke_release:
+                d_range = f"Choked ({choke_target_station})"
+                
             tot_out = sum(st_output[m])
             avg_wip_val = 0.0
             if m != 'A':
@@ -457,31 +471,20 @@ with tab2:
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
     st.markdown("""
-    This page pulls back the curtain on the simulation engine. It explains how **dependency**, **fluctuation**, and **strategic control mechanisms** (The Choke Principle) work.
+    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
     """)
 
     st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
     st.markdown("### System Architecture")
+    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
     st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
 
     st.info("""
     **The Student's Guide to Movement Logic:**
     The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
     """)
-    st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
 
-    st.markdown("---")
-    
-    st.header("🛑 The Choke Release Principle (Drum-Buffer-Rope)")
-    st.markdown("""
-    In a classic push system, Station A injects raw materials into the system at full capacity regardless of downstream constraints. This triggers an explosion of downstream WIP before the bottleneck station.
-    
-    When **Choke Release** is activated, Station A shifts from a **Push** configuration to a **Pull** mechanism regulated by the system constraint (the Drum):
-    """)
-    st.latex(r"\text{Throttled Dice Roll}_{A} = \min(\text{Dice Roll}_{A}, \text{Dice Roll}_{\text{Bottleneck}})")
-    st.markdown("""
-    **Expected Outcome:** Total System Throughput remains virtually identical (since the system cannot produce faster than its slowest constraint anyway), but **Average WIP** and **Lead Times** drop sharply, optimizing system performance.
-    """)
+    st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
 
     st.markdown("---")
 
@@ -496,6 +499,7 @@ with tab3:
 
     with col2:
         st.write("### Lead Time ($L$)")
+        st.markdown("Calculated based on average daily WIP levels relative to throughput rate.")
         st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
 
         st.write("### Entropy Spread ($\sigma H$)")
@@ -505,3 +509,11 @@ with tab3:
 
     st.header("🔬 Table B: Station-Level Flow Diagnostics")
     st.latex(r"H = -\sum P(x) \log_2 P(x)")
+
+    st.markdown("""
+    **How to read Table B:**
+    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**.
+    * **Entropy ($H_i$):**
+        * **Stable (< 2.4):** Predictable output.
+        * **Variable (≥ 2.4):** High 'jitter' or chaos.
+    """)
