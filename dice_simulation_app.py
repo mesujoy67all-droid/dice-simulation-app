@@ -86,7 +86,7 @@ if capacity_mode == "Random Generation":
 
     st.sidebar.caption(f"Current Seed: {st.session_state.sim_seed}")
     
-    members_list = [chr(64 + i) for i in range(1, 9)] 
+    members_list = [chr(64 + i) for i in range(1, 8)] # Dynamic range up to G (7 workstations)
     
     for m in members_list:
         dice_configs[m] = st.sidebar.slider(f"Dice Range for {m}", 1, 20, (1, 6))
@@ -129,6 +129,27 @@ else:
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
+
+# SECTION 1B: CHOKE RELEASE (CONSTRAINED INPUT) OPTION
+st.sidebar.markdown("---")
+st.sidebar.header("🛑 Choke Release Configuration")
+
+choke_enabled = False
+choke_target_station = None
+
+if is_base_run:
+    st.sidebar.info("💡 Run the baseline scenario first to identify your bottleneck station.")
+else:
+    choke_enabled = st.sidebar.toggle("🔗 Enable Choke Release (Throttle Station A)", value=False)
+    if choke_enabled:
+        # Exclude Station A since it can't choke itself
+        potential_bottlenecks = [m for m in members if m != 'A']
+        choke_target_station = st.sidebar.selectbox(
+            "Select Target Bottleneck Station to Synchronize Station A with:",
+            options=potential_bottlenecks,
+            help="Station A's daily roll will be capped by the selected station's capacity roll for that day."
+        )
+        st.sidebar.success(r"🎯 Station A is now synchronized with Station " + choke_target_station)
 
 # SECTION 2: WIP INITIALIZATION
 st.sidebar.markdown("---")
@@ -202,6 +223,8 @@ if run_sim_clicked:
             applied_configs_desc.append(f"{m}(Range:{dice_configs[m][0]}-{dice_configs[m][1]})")
 
         dice_info = " | ".join(applied_configs_desc)
+        if choke_enabled and choke_target_station:
+            dice_info += f" | 🛑 Choke: A constrained by {choke_target_station}"
 
         # 2. Simulation Operations Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
@@ -212,7 +235,13 @@ if run_sim_clicked:
         pennies_movement_data = defaultdict(list)
 
         for day in df_dice.index:
-            day_rolls = df_dice.loc[day]
+            day_rolls = df_dice.loc[day].to_dict()
+            
+            # --- APPLY CHOKE LOGIC TO STATION A ---
+            if choke_enabled and choke_target_station:
+                # Station A cannot produce more than what the targeted bottleneck is capable of rolling today
+                day_rolls['A'] = min(day_rolls['A'], day_rolls[choke_target_station])
+            
             daily_fg_out = 0
             
             for i, m in enumerate(members):
@@ -269,6 +298,9 @@ if run_sim_clicked:
 
         # Determine structural logging contexts
         scen_label = "Base-Run" if is_base_run else f"Scenario #{history_count}"
+        if choke_enabled and choke_target_station:
+            scen_label += f" (Choke-{choke_target_station})"
+            
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={initial_wip[k]}" for k in wip_keys])
         run_description = f"Days={num_days} | Mode={capacity_mode} | WIP: {wip_summary} | Configs: {dice_info}"
 
@@ -399,7 +431,6 @@ with tab2:
                     target_station = f"Station {b_label[1]}" 
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == target_station)]
                     if not subset.empty:
-                        # Fixed calculation bug: Average WIP inventory count remains unscaled across time boundaries
                         val = subset["Avg WIP"].values[0]
                         row_data[b_label] = round(val, 2)
                     else:
@@ -426,20 +457,31 @@ with tab2:
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
     st.markdown("""
-    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
+    This page pulls back the curtain on the simulation engine. It explains how **dependency**, **fluctuation**, and **strategic control mechanisms** (The Choke Principle) work.
     """)
 
     st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
     st.markdown("### System Architecture")
-    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
     st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
 
     st.info("""
     **The Student's Guide to Movement Logic:**
     The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
     """)
-
     st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
+
+    st.markdown("---")
+    
+    st.header("🛑 The Choke Release Principle (Drum-Buffer-Rope)")
+    st.markdown("""
+    In a classic push system, Station A injects raw materials into the system at full capacity regardless of downstream constraints. This triggers an explosion of downstream WIP before the bottleneck station.
+    
+    When **Choke Release** is activated, Station A shifts from a **Push** configuration to a **Pull** mechanism regulated by the system constraint (the Drum):
+    """)
+    st.latex(r"\text{Throttled Dice Roll}_{A} = \min(\text{Dice Roll}_{A}, \text{Dice Roll}_{\text{Bottleneck}})")
+    st.markdown("""
+    **Expected Outcome:** Total System Throughput remains virtually identical (since the system cannot produce faster than its slowest constraint anyway), but **Average WIP** and **Lead Times** drop sharply, optimizing system performance.
+    """)
 
     st.markdown("---")
 
@@ -454,7 +496,6 @@ with tab3:
 
     with col2:
         st.write("### Lead Time ($L$)")
-        st.markdown("Calculated based on average daily WIP levels relative to throughput rate.")
         st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
 
         st.write("### Entropy Spread ($\sigma H$)")
@@ -464,11 +505,3 @@ with tab3:
 
     st.header("🔬 Table B: Station-Level Flow Diagnostics")
     st.latex(r"H = -\sum P(x) \log_2 P(x)")
-
-    st.markdown("""
-    **How to read Table B:**
-    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**.
-    * **Entropy ($H_i$):**
-        * **Stable (< 2.4):** Predictable output.
-        * **Variable (≥ 2.4):** High 'jitter' or chaos.
-    """)
