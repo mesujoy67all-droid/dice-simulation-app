@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS Styling for Premium Institutional Theme ---
+# --- CSS Styling for Premium Institutional Theme & Section Borders ---
 st.markdown("""
     <style>
     .main .block-container { padding-top: 2rem; }
@@ -19,6 +19,16 @@ st.markdown("""
     div[data-testid="stMetricLabel"] { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
     .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
     .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+    
+    /* Elegant Section Border Card Container */
+    .card-border {
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        background-color: #FFFFFF;
+        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -372,7 +382,7 @@ if run_sim_clicked:
         days_per_month = 20
         num_months = int(np.ceil(num_days / days_per_month))
         for m in members:
-            station_label = m  # MANDATED: Simplified identifier format
+            station_label = m  
             low, high = dice_configs.get(m, (1, 6))
             d_range = f"{low}-{high}"
             if m == 'A' and activate_choke_release:
@@ -425,8 +435,27 @@ with tab1:
     if st.session_state.active_results is not None:
         res = st.session_state.active_results
 
-        # Metric Presentation Section
-        st.markdown(f"### 🏁 Executive Target Summary ({res['scen_label']})")
+        # Section 1: Table of Dice Rolls
+        st.markdown('<div class="card-border">', unsafe_allow_html=True)
+        st.subheader("🎲 Table of Dice Rolls (Capacity Applied)")
+        st.dataframe(res["df_dice"], use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Section 2: Day-wise Pennies Movement
+        st.markdown('<div class="card-border">', unsafe_allow_html=True)
+        st.subheader("🪙 Day-wise Pennies Movement")
+        st.dataframe(res["df_pennies_final"], use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Section 3: WIP History
+        st.markdown('<div class="card-border">', unsafe_allow_html=True)
+        st.subheader("📦 Work-In-Progress (WIP) History")
+        st.dataframe(res["results_df"], use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Section 4: Target Summary KPIs (MOVED TO BOTTOM WITH BORDER)
+        st.markdown('<div class="card-border" style="border: 2px solid #1E3A8A; background-color: #F8FAFC;">', unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color: #1E3A8A; margin-top: 0;'>🏁 Executive Target Summary ({res['scen_label']})</h3>", unsafe_allow_html=True)
         m_col1, m_col2, m_col3 = st.columns(3)
         with m_col1:
             st.metric(label="Total Throughput Yield", value=f"{int(res['total_fg'])} units", delta=None)
@@ -434,17 +463,8 @@ with tab1:
             st.metric(label="System Throughput Rate (TR)", value=f"{round(res['total_fg'] / res['num_days'], 2)} units/day", delta=None)
         with m_col3:
             st.metric(label="Terminating WIP Stockpile", value=f"{int(res['final_wip_inventory'])} units", delta=None)
-        
-        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        st.subheader("🎲 Table of Dice Rolls (Capacity Applied)")
-        st.dataframe(res["df_dice"], use_container_width=True)
-
-        st.subheader("🪙 Day-wise Pennies Movement")
-        st.dataframe(res["df_pennies_final"], use_container_width=True)
-
-        st.subheader("📦 Work-In-Progress (WIP) History")
-        st.dataframe(res["results_df"], use_container_width=True)
     else:
         st.markdown("""
             <div style="background-color: #EFF6FF; border-left: 5px solid #3B82F6; padding: 1.5rem; border-radius: 4px; margin-top: 2rem;">
@@ -479,7 +499,6 @@ with tab2:
         
         if rows_b:
             df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
-            # Table B renders clean simplified station identifiers dynamically as headers (A, B, C...)
             st.table(df_table_b)
             
         st.markdown("---")
