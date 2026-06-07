@@ -42,6 +42,45 @@ st.markdown("""
         color: #1E3A8A !important;
         border-bottom-color: #1E3A8A !important;
     }
+    
+    /* --- Flow Visualizer Cards CSS --- */
+    .station-box {
+        background-color: #ffffff;
+        border: 2px solid #1E3A8A;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.05);
+    }
+    .station-title {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #1E3A8A;
+        margin-bottom: 4px;
+    }
+    .buffer-box {
+        background-color: #FEF3C7;
+        border: 2px dashed #D97706;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        margin-top: 15px;
+    }
+    .buffer-title {
+        font-size: 0.85rem;
+        font-weight: bold;
+        color: #B45309;
+        margin-bottom: 4px;
+    }
+    .arrow-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        font-size: 2rem;
+        color: #9CA3AF;
+        margin-top: 15px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -264,12 +303,16 @@ if run_sim_clicked:
         st_wip_trend = defaultdict(list)
         pennies_movement_data = defaultdict(list)
 
+        # Dynamic mapping lists to capture average dice execution capabilities
+        st_raw_rolls = defaultdict(list)
+
         for day in df_dice.index:
             day_rolls = df_dice.loc[day]
             daily_fg_out = 0
             
             for i, m in enumerate(members):
                 roll = day_rolls[m]
+                st_raw_rolls[m].append(roll)
                 
                 if i == 0:
                     move_a = roll
@@ -341,6 +384,10 @@ if run_sim_clicked:
 
         days_per_month = 20
         num_months = int(np.ceil(num_days / days_per_month))
+        
+        # Prepare dynamic visuals storage context dictionary mapping
+        visual_station_metrics = {}
+
         for m in members:
             station_label = f"Station {m}"
             low, high = dice_configs.get(m, (1, 6))
@@ -372,9 +419,16 @@ if run_sim_clicked:
                 "Entropy Spread σH (Monthly)": spread_h_monthly, "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
             })
 
+            # Populate metrics for visual interactive factory blueprint map components
+            visual_station_metrics[m] = {
+                "avg_roll": round(np.mean(st_raw_rolls[m]), 2),
+                "avg_out": round(np.mean(st_output[m]), 2)
+            }
+
         st.session_state.active_results = {
             "scen_label": scen_label, "df_dice": df_dice, "df_pennies_final": df_pennies_final,
-            "results_df": results_df, "total_fg": total_fg, "num_days": num_days, "final_wip_inventory": final_wip_inventory
+            "results_df": results_df, "total_fg": total_fg, "num_days": num_days, "final_wip_inventory": final_wip_inventory,
+            "visual_metrics": visual_station_metrics, "st_wip_trend": st_wip_trend
         }
         st.rerun()
 
@@ -386,10 +440,126 @@ with tab1:
     
     if st.session_state.active_results is not None:
         res = st.session_state.active_results
-        
         st.markdown(f"### Current Execution State: **{res['scen_label']}**")
         
-        # Repositioned Section: Granular Execution Logs placed right under the main header status line
+        # --- NEW LIVE FACTORY INTERACTIVE BLUEPRINT MAP VISUALIZER ---
+        st.markdown("### 🗺️ Plant Floor Pipeline Routing Map")
+        st.caption("This interactive floor map renders real simulation averages. Notice where throughput cracks beneath raw rolling capacity due to dependency constraints!")
+        
+        v_met = res["visual_metrics"]
+        w_trend = res["st_wip_trend"]
+        
+        # We loop across 7 processing node configurations mapping structures inline
+        v_cols = st.columns([2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2])
+        
+        # Station A
+        with v_cols[0]:
+            st.markdown(f"""<div class='station-box'>
+                <div class='station-title'>Station A</div>
+                <hr style='margin:4px 0;'/>
+                <p style='margin:0;font-size:0.8rem;'>🎲 Potential: <b>{v_met['A']['avg_roll']}</b></p>
+                <p style='margin:0;font-size:0.8rem;color:#10B981;'>📦 Yield TR: <b>{v_met['A']['avg_out']}</b></p>
+            </div>""", unsafe_allow_html=True)
+            
+        # Buffer AB
+        with v_cols[1]:
+            st.markdown(f"""<div class='buffer-box'>
+                <div class='buffer-title'>WIP AB</div>
+                <span style='font-size:1.2rem;font-weight:bold;color:#B45309;'>{round(np.mean(w_trend['AB']),1)}</span>
+            </div>""", unsafe_allow_html=True)
+            
+        # Station B
+        with v_cols[2]:
+            st.markdown(f"""<div class='station-box'>
+                <div class='station-title'>Station B</div>
+                <hr style='margin:4px 0;'/>
+                <p style='margin:0;font-size:0.8rem;'>🎲 Potential: <b>{v_met['B']['avg_roll']}</b></p>
+                <p style='margin:0;font-size:0.8rem;color:#10B981;'>📦 Yield TR: <b>{v_met['B']['avg_out']}</b></p>
+            </div>""", unsafe_allow_html=True)
+            
+        # Buffer BC
+        with v_cols[3]:
+            st.markdown(f"""<div class='buffer-box'>
+                <div class='buffer-title'>WIP BC</div>
+                <span style='font-size:1.2rem;font-weight:bold;color:#B45309;'>{round(np.mean(w_trend['BC']),1)}</span>
+            </div>""", unsafe_allow_html=True)
+            
+        # Station C
+        with v_cols[4]:
+            st.markdown(f"""<div class='station-box'>
+                <div class='station-title'>Station C</div>
+                <hr style='margin:4px 0;'/>
+                <p style='margin:0;font-size:0.8rem;'>🎲 Potential: <b>{v_met['C']['avg_roll']}</b></p>
+                <p style='margin:0;font-size:0.8rem;color:#10B981;'>📦 Yield TR: <b>{v_met['C']['avg_out']}</b></p>
+            </div>""", unsafe_allow_html=True)
+            
+        # Buffer CD
+        with v_cols[5]:
+            st.markdown(f"""<div class='buffer-box'>
+                <div class='buffer-title'>WIP CD</div>
+                <span style='font-size:1.2rem;font-weight:bold;color:#B45309;'>{round(np.mean(w_trend['CD']),1)}</span>
+            </div>""", unsafe_allow_html=True)
+            
+        # Station D
+        with v_cols[6]:
+            st.markdown(f"""<div class='station-box'>
+                <div class='station-title'>Station D</div>
+                <hr style='margin:4px 0;'/>
+                <p style='margin:0;font-size:0.8rem;'>🎲 Potential: <b>{v_met['D']['avg_roll']}</b></p>
+                <p style='margin:0;font-size:0.8rem;color:#10B981;'>📦 Yield TR: <b>{v_met['D']['avg_out']}</b></p>
+            </div>""", unsafe_allow_html=True)
+
+        # Buffer DE
+        with v_cols[7]:
+            st.markdown(f"""<div class='buffer-box'>
+                <div class='buffer-title'>WIP DE</div>
+                <span style='font-size:1.2rem;font-weight:bold;color:#B45309;'>{round(np.mean(w_trend['DE']),1)}</span>
+            </div>""", unsafe_allow_html=True)
+
+        # Station E
+        with v_cols[8]:
+            st.markdown(f"""<div class='station-box'>
+                <div class='station-title'>Station E</div>
+                <hr style='margin:4px 0;'/>
+                <p style='margin:0;font-size:0.8rem;'>🎲 Potential: <b>{v_met['E']['avg_roll']}</b></p>
+                <p style='margin:0;font-size:0.8rem;color:#10B981;'>📦 Yield TR: <b>{v_met['E']['avg_out']}</b></p>
+            </div>""", unsafe_allow_html=True)
+
+        # Buffer EF
+        with v_cols[9]:
+            st.markdown(f"""<div class='buffer-box'>
+                <div class='buffer-title'>WIP EF</div>
+                <span style='font-size:1.2rem;font-weight:bold;color:#B45309;'>{round(np.mean(w_trend['EF']),1)}</span>
+            </div>""", unsafe_allow_html=True)
+
+        # Station F
+        with v_cols[10]:
+            st.markdown(f"""<div class='station-box'>
+                <div class='station-title'>Station F</div>
+                <hr style='margin:4px 0;'/>
+                <p style='margin:0;font-size:0.8rem;'>🎲 Potential: <b>{v_met['F']['avg_roll']}</b></p>
+                <p style='margin:0;font-size:0.8rem;color:#10B981;'>📦 Yield TR: <b>{v_met['F']['avg_out']}</b></p>
+            </div>""", unsafe_allow_html=True)
+
+        # Buffer FG
+        with v_cols[11]:
+            st.markdown(f"""<div class='buffer-box'>
+                <div class='buffer-title'>WIP FG</div>
+                <span style='font-size:1.2rem;font-weight:bold;color:#B45309;'>{round(np.mean(w_trend['FG']),1)}</span>
+            </div>""", unsafe_allow_html=True)
+
+        # Station G
+        with v_cols[12]:
+            st.markdown(f"""<div class='station-box'>
+                <div class='station-title'>Station G</div>
+                <hr style='margin:4px 0;'/>
+                <p style='margin:0;font-size:0.8rem;'>🎲 Potential: <b>{v_met['G']['avg_roll']}</b></p>
+                <p style='margin:0;font-size:0.8rem;color:#10B981;'>📦 Yield TR: <b>{v_met['G']['avg_out']}</b></p>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown("---")
+        
+        # Granular Execution Logs
         st.markdown("### 🔍 Granular Execution Logs")
         with st.expander("🎲 Capacity Generation Profile Data Matrix (Dice Outputs)", expanded=False):
             st.dataframe(res["df_dice"], use_container_width=True)
@@ -402,7 +572,7 @@ with tab1:
             
         st.markdown("---")
         
-        # Summary metrics section follows lower down the line
+        # Summary metrics section
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
             with st.container(border=True):
