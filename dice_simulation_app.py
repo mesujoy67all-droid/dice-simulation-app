@@ -132,9 +132,9 @@ if capacity_mode == "Random Generation":
     
     for m in members_list:
         with st.sidebar.expander(f"Station {m} Parameters", expanded=False):
-            dice_configs[m] = st.slider(f"Dice Range:", 1, 20, (1, 6), key=f"range_{m}")
+            dice_configs[m] = st.sidebar.slider(f"Dice Range:", 1, 20, (1, 6), key=f"range_{m}")
             if not is_base_run:
-                station_frequencies[m] = st.selectbox(
+                station_frequencies[m] = st.sidebar.selectbox(
                     f"Operational Interval:", 
                     list(range(1, 31)), 
                     index=0, 
@@ -144,6 +144,7 @@ if capacity_mode == "Random Generation":
             else:
                 station_frequencies[m] = 1 
 
+    # Editable day counts enabled
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500)
     num_members = 7
 
@@ -379,17 +380,25 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Diag
 with tab1:
     st.markdown("<h2 style='color: #1E3A8A;'>🏭 Live Operations & Flow Visualization</h2>", unsafe_allow_html=True)
     
-    # Static visual layout of the production floor line
-    with st.container(border=True):
-        st.markdown("**Active Factory Floor Line Map:**")
-        st.code("🏭 [Station A] ➔ 📦 Buffer AB ➔ [Station B] ➔ 📦 Buffer BC ➔ [Station C] ➔ 📦 Buffer CD ➔ [Station D]... ➔ 🏁 [Finished Goods]")
-    
     if st.session_state.active_results is not None:
         res = st.session_state.active_results
         
         st.markdown(f"### Current Execution State: **{res['scen_label']}**")
         
-        # High Vis Metric Tiles
+        # Repositioned Section: Granular Execution Logs placed right under the main header status line
+        st.markdown("### 🔍 Granular Execution Logs")
+        with st.expander("🎲 Capacity Generation Profile Data Matrix (Dice Outputs)", expanded=False):
+            st.dataframe(res["df_dice"], use_container_width=True)
+            
+        with st.expander("🪙 Step-Wise Log Performance Matrix (Pennies Realized Movement)", expanded=False):
+            st.dataframe(res["df_pennies_final"], use_container_width=True)
+            
+        with st.expander("📦 Queue Log (Buffer Inventory Histories)", expanded=False):
+            st.dataframe(res["results_df"], use_container_width=True)
+            
+        st.markdown("---")
+        
+        # Summary metrics section follows lower down the line
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
             with st.container(border=True):
@@ -400,21 +409,6 @@ with tab1:
         with col_m3:
             with st.container(border=True):
                 st.metric("Ending WIP Accumulation", f"{int(res['final_wip_inventory'])} units")
-                
-        # Interactive Performance Trend Lines
-        st.markdown("### 📈 Industrial Flow Performance Analytics")
-        st.line_chart(res["results_df"][["Daily_Total_WIP", "Cumulative Throughput"]], height=350)
-        
-        # Structured Accordion Layouts for deep diving data
-        st.markdown("### 🔍 Granular Execution Logs")
-        with st.expander("🎲 Capacity Generation Profile Data Matrix (Dice Outputs)", expanded=False):
-            st.dataframe(res["df_dice"], use_container_width=True)
-            
-        with st.expander("🪙 Step-Wise Log Performance Matrix (Pennies Realized Movement)", expanded=False):
-            st.dataframe(res["df_pennies_final"], use_container_width=True)
-            
-        with st.expander("📦 Queue Log (Buffer Inventory Histories)", expanded=False):
-            st.dataframe(res["results_df"], use_container_width=True)
     else:
         st.info("💡 Adjust your factory configurations in the sidebar and click 'Execute & Save Run' to initialize the production studio.")
 
