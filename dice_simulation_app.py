@@ -14,6 +14,10 @@ if 'user_db' not in st.session_state:
 if 'authenticated_user' not in st.session_state:
     st.session_state.authenticated_user = None
 
+# --- NEW: PERSISTENCE STORAGE INITIALIZATION ---
+if 'active_results' not in st.session_state:
+    st.session_state.active_results = None
+
 # --- Authentication Gateway ---
 def auth_gateway():
     st.title("🔐 Production Simulation Gateway")
@@ -52,7 +56,7 @@ if st.session_state.authenticated_user is None:
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
-# Determine history count to check current state (Base Run vs Scenarios)
+# Determine history count to check current state
 history_count = len(user_record["history"])
 is_base_run = (history_count == 0)
 
@@ -94,54 +98,43 @@ else:
     
     if uploaded_file is not None:
         try:
-            # Read excel sheet
             uploaded_df = pd.read_excel(uploaded_file, index_col=0)
             num_days = len(uploaded_df)
             num_members = len(uploaded_df.columns)
-            
             st.sidebar.success(f"📂 Loaded Baseline: {num_days} Days, {num_members} Stations.")
         except Exception as e:
             st.sidebar.error(f"Error parsing file: {e}. Ensure 'Day' is the first column.")
             
-    # --- SCENARIO MODIFICATION LOGIC FOR EXCEL FILE ---
     if not is_base_run and uploaded_df is not None:
         st.sidebar.markdown("---")
         st.sidebar.header("🚀 Scenario Improvements")
         st.sidebar.info(f"Modifying Scenario #{history_count}. Add capacity boosts to optimize your baseline flow!")
         
-        # Create an additive modifier slider for every loaded station column
         temp_members = [chr(64 + i) for i in range(1, num_members + 1)]
         for m in temp_members:
-            dice_boosts[m] = st.sidebar.slider(f"Capacity Boost for Station {m}", 0, 10, 0, help="Adds static capacity to this station's daily imported excel value.")
+            dice_boosts[m] = st.sidebar.slider(f"Capacity Boost for Station {m}", 0, 10, 0)
     elif is_base_run and uploaded_df is not None:
         st.sidebar.markdown("---")
         st.sidebar.warning("🔒 Base Run Active: Dice modification parameters are locked to imported values.")
 
-# Generate target structures dynamically based on setup dimensions
+# Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
 st.sidebar.header("WIP Initialization")
 initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
-# The "Run" button
-if st.sidebar.button("▶ Run & Save Simulation"):
-    if capacity_mode == "Import Excel File" and uploaded_df is None:
-        st.sidebar.error("Please upload a valid Excel file first!")
-        st.session_state.trigger_sim = False
-    else:
-        st.session_state.trigger_sim = True
-else:
-    st.session_state.trigger_sim = False
-
+# Clear / Logout handlers
 st.sidebar.markdown("---")
 if st.sidebar.button("🗑️ Clear Whole History"):
     user_record["history"] = []
     user_record["stations"] = []
+    st.session_state.active_results = None
     st.rerun()
 
 if st.sidebar.button("🚪 Logout & Exit"):
     st.session_state.authenticated_user = None
+    st.session_state.active_results = None
     st.rerun()
 
 # --- Utility Functions ---
@@ -151,14 +144,12 @@ def calculate_entropy(values):
     p = counts / counts.sum()
     return -np.sum(p * np.log2(p))
 
-# --- Application Tabs ---
-tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology"])
-
-with tab1:
-    st.title("🚀 Live Operations Console")
-    
-    if st.session_state.get('trigger_sim', False):
-        
+# --- Simulation Processing Engine ---
+# Executed only when button clicked, then saved permanently to session memory
+if st.sidebar.button("▶ Run & Save Simulation"):
+    if capacity_mode == "Import Excel File" and uploaded_df is None:
+        st.sidebar.error("Please upload a valid Excel file first!")
+    else:
         # 1. Capacity Generation/Loading
         if capacity_mode == "Random Generation":
             np.random.seed(st.session_state.sim_seed)
@@ -168,12 +159,10 @@ with tab1:
             df_dice.index.name = "Day"
             dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         else:
-            # Map columns to correct string names
             df_dice = uploaded_df.copy()
             df_dice.columns = members
             df_dice.index.name = "Day"
             
-            # Apply dynamic strategic adjustments if we are past the Base Run stage
             if not is_base_run and dice_boosts:
                 applied_boosts_desc = []
                 for m in members:
@@ -185,7 +174,7 @@ with tab1:
             else:
                 dice_info = "Imported Base Excel Values (Locked)"
 
-        # 2. Simulation Logic
+        # 2. Simulation Operations Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
         total_fg = 0
@@ -233,46 +222,24 @@ with tab1:
                 "Day Wise Total FG": daily_fg_out
             })
 
-        # --- DISPLAY RESULTS ---
-        st.subheader("🎲 Table of Dice Rolls (Capacity Applied)")
-        st.dataframe(df_dice, use_container_width=True)
-
-        st.subheader("🪙 Day-wise Pennies Movement")
+        # Process Extra Performance Tables Matrix Data
         df_pennies = pd.DataFrame(pennies_movement_data)
         df_pennies.index = range(1, num_days + 1)
         df_pennies.index.name = "Day"
-
         total_output_row = df_pennies.sum().to_frame().T
         total_output_row.index = ["THROUGHPUT"]
-        
         entropy_vals = {m: round(calculate_entropy(pennies_movement_data[m]), 3) for m in members}
         entropy_row = pd.DataFrame([entropy_vals])
         entropy_row.index = ["ENTROPY (H)"]
-
         df_pennies_final = pd.concat([df_pennies, total_output_row, entropy_row])
-        st.dataframe(df_pennies_final, use_container_width=True)
 
-        st.subheader("📦 Work-In-Progress (WIP) History")
         results_df = pd.DataFrame(history).set_index("Day")
         results_df["Cumulative Throughput"] = results_df["Day Wise Total FG"].cumsum()
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
-        st.dataframe(results_df, use_container_width=True)
-
-        # Setup Labels for logging history records
-        scen_label = "Base-Run" if is_base_run else f"Scenario #{history_count}"
-        st.subheader(f"🏁 {scen_label} Results")
-        
         final_wip_inventory = sum(wip_buffers.values())
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Throughput", int(total_fg)) 
-        c2.metric("Throughput Rate (TR)", round(total_fg / num_days, 2))
-        c3.metric("Ending WIP Inventory", int(final_wip_inventory)) 
-
-        st.subheader("📈 Performance Trends")
-        st.line_chart(results_df[["Daily_Total_WIP", "Cumulative Throughput"]])
-
-        # --- Logging Table Parameters ---
+        # Determine structural logging contexts
+        scen_label = "Base-Run" if is_base_run else f"Scenario #{history_count}"
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={initial_wip[k]}" for k in wip_keys])
         run_description = f"Days={num_days} | Mode={capacity_mode} | WIP: {wip_summary} | Dice Configs: {dice_info}"
 
@@ -280,6 +247,7 @@ with tab1:
         avg_total_wip_per_day = sum_total_wip / num_days
         calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
 
+        # Append to historical datastores
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": run_description,
@@ -292,19 +260,15 @@ with tab1:
             "Entropy Spread σH": round(np.std([calculate_entropy(st_output[m]) for m in members]), 2)
         })
 
-        # --- Logging Station Flow Diagnostics ---
         days_per_month = 20
         num_months = int(np.ceil(num_days / days_per_month))
-
         for m in members:
             station_label = f"Station {m}"
             if capacity_mode == "Import Excel File":
                 d_range = f"Excel Base" if is_base_run else f"Excel (+{dice_boosts.get(m, 0)})"
             else:
                 d_range = f"{dice_configs[m][0]}-{dice_configs[m][1]}"
-                
             tot_out = sum(st_output[m])
-            
             avg_wip_val = 0.0
             if m != 'A':
                 try:
@@ -320,23 +284,56 @@ with tab1:
                 month_data = st_output[m][start:end]
                 if len(month_data) > 0:
                     monthly_entropies.append(calculate_entropy(month_data))
-            
             avg_h_monthly = round(np.mean(monthly_entropies), 3) if monthly_entropies else 0.0
             spread_h_monthly = round(np.std(monthly_entropies), 3) if monthly_entropies else 0.0
 
             user_record["stations"].append({
-                "Scenario": scen_label, 
-                "Station": station_label, 
-                "Dice Range": d_range,
-                "Throughput": tot_out,
-                "Avg WIP": avg_wip_val,
-                "Entropy Hi (Monthly Avg)": avg_h_monthly,
-                "Entropy Spread σH (Monthly)": spread_h_monthly,
-                "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
+                "Scenario": scen_label, "Station": station_label, "Dice Range": d_range,
+                "Throughput": tot_out, "Avg WIP": avg_wip_val, "Entropy Hi (Monthly Avg)": avg_h_monthly,
+                "Entropy Spread σH (Monthly)": spread_h_monthly, "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
             })
-        
-        # Force a state refresh so sidebar configuration locks update dynamically on next interaction
+
+        # Save all UI layout structures inside session state memory to survive re-renders!
+        st.session_state.active_results = {
+            "scen_label": scen_label,
+            "df_dice": df_dice,
+            "df_pennies_final": df_pennies_final,
+            "results_df": results_df,
+            "total_fg": total_fg,
+            "num_days": num_days,
+            "final_wip_inventory": final_wip_inventory
+        }
         st.rerun()
+
+# --- Application Tabs ---
+tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology"])
+
+with tab1:
+    st.title("🚀 Live Operations Console")
+    
+    # Read calculations directly from memory storage
+    if st.session_state.active_results is not None:
+        res = st.session_state.active_results
+
+        st.subheader("🎲 Table of Dice Rolls (Capacity Applied)")
+        st.dataframe(res["df_dice"], use_container_width=True)
+
+        st.subheader("🪙 Day-wise Pennies Movement")
+        st.dataframe(res["df_pennies_final"], use_container_width=True)
+
+        st.subheader("📦 Work-In-Progress (WIP) History")
+        st.dataframe(res["results_df"], use_container_width=True)
+
+        st.subheader(f"🏁 {res['scen_label']} Results")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Throughput", int(res["total_fg"])) 
+        c2.metric("Throughput Rate (TR)", round(res["total_fg"] / res["num_days"], 2))
+        c3.metric("Ending WIP Inventory", int(res["final_wip_inventory"])) 
+
+        st.subheader("📈 Performance Trends")
+        st.line_chart(res["results_df"][["Daily_Total_WIP", "Cumulative Throughput"]])
+    else:
+        st.info("💡 Adjust sidebar parameters and click 'Run & Save Simulation' to load dashboard displays.")
 
 with tab2:
     st.title("📊 Strategic Performance Analytics")
@@ -350,26 +347,14 @@ with tab2:
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
         
-        metrics_to_show = [
-            "Dice Range", 
-            "Throughput", 
-            "Avg WIP", 
-            "Entropy Hi (Monthly Avg)", 
-            "Entropy Spread σH (Monthly)", 
-            "Interpretation"
-        ]
-        
+        metrics_to_show = ["Dice Range", "Throughput", "Avg WIP", "Entropy Hi (Monthly Avg)", "Entropy Spread σH (Monthly)", "Interpretation"]
         rows_b = []
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics_to_show):
                 row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
-                
                 for s_label in s_df['Station'].unique():
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
-                    if not subset.empty and metric in subset.columns:
-                        row_data[s_label] = subset[metric].values[0]
-                    else:
-                        row_data[s_label] = "N/A"
+                    row_data[s_label] = subset[metric].values[0] if not subset.empty and metric in subset.columns else "N/A"
                 rows_b.append(row_data)
         
         if rows_b:
@@ -380,29 +365,20 @@ with tab2:
         st.subheader("Table C: Temporal WIP Averages (By Buffer)")
         all_recorded_stations = s_df['Station'].unique()
         recorded_letters = sorted([s.split(" ")[1] for s in all_recorded_stations])
-        
-        buffer_labels = []
-        for i in range(len(recorded_letters) - 1):
-            buffer_labels.append(f"{recorded_letters[i]}{recorded_letters[i+1]}")
+        buffer_labels = [f"{recorded_letters[i]}{recorded_letters[i+1]}" for i in range(len(recorded_letters) - 1)]
 
         rows_c = []
         for scen in s_df['Scenario'].unique():
             for period in ["Day-wise Avg WIP", "Week-wise Avg WIP", "Month-wise Avg WIP"]:
                 row_data = {"Scenario": scen, "Time Metric": period}
-                
                 for b_label in buffer_labels:
                     target_station = f"Station {b_label[1]}" 
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == target_station)]
-                    
                     if not subset.empty:
                         total_wip_accumulated = subset["Avg WIP"].values[0] * num_days
-                        
-                        if period == "Day-wise Avg WIP":
-                            val = total_wip_accumulated / num_days
-                        elif period == "Week-wise Avg WIP":
-                            val = total_wip_accumulated / (num_days / 5)
-                        else: 
-                            val = total_wip_accumulated / (num_days / 20)
+                        if period == "Day-wise Avg WIP": val = total_wip_accumulated / num_days
+                        elif period == "Week-wise Avg WIP": val = total_wip_accumulated / (num_days / 5)
+                        else: val = total_wip_accumulated / (num_days / 20)
                         row_data[b_label] = round(val, 2)
                     else:
                         row_data[b_label] = 0.0
@@ -419,7 +395,6 @@ with tab2:
             df_table_a.to_excel(writer, sheet_name='Summary History')
             df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
             df_table_c.reset_index().to_excel(writer, sheet_name='Temporal WIP', index=False)
-
         excel_data = output.getvalue()
         st.download_button(label="Download Full Analytics Excel", data=excel_data, file_name=f"Full_Simulation_{current_user}.xlsx")
     else:
