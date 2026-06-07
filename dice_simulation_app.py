@@ -20,13 +20,14 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
     .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
     
-    /* Elegant Border Wrapper for Station Selectors in Sidebar */
+    /* Clean, defined box wrapping entirely around each individual station block */
     .station-box {
-        border: 1px solid #E2E8F0;
+        border: 1px solid #CBD5E1;
         background-color: #F8FAFC;
-        padding: 12px 14px;
+        padding: 16px;
         border-radius: 8px;
-        margin-bottom: 10px;
+        margin-top: 12px;
+        margin-bottom: 12px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -135,14 +136,14 @@ if capacity_mode == "Random Generation":
 
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
     for m in members_list[:7]: # Default to 7 workstations
-        # Wrap each slider configuration inside a border card container
+        # Open the perimeter card wrapper around the whole station block
         st.sidebar.markdown(f'<div class="station-box">', unsafe_allow_html=True)
         if m == 'A' and activate_choke_release and choke_target_station:
             st.sidebar.markdown(f"**Workstation {m} Configuration**")
             st.sidebar.caption("Operational Range: *Mirrored from Target*")
-            st.sidebar.markdown('</div>', unsafe_allow_html=True)
-            continue
-        dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
+        else:
+            dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
+        # Safely seal the perimeter border wrapper around the specific station contents
         st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500)
@@ -183,13 +184,14 @@ else:
             
             st.sidebar.markdown("<br>", unsafe_allow_html=True)
             for m in temp_members:
+                # Open the structural container border around the importing scenario stations
                 st.sidebar.markdown(f'<div class="station-box">', unsafe_allow_html=True)
                 if m == 'A' and activate_choke_release:
                     st.sidebar.markdown(f"**Workstation {m} Configuration**")
                     st.sidebar.caption("Operational Range: *Mirrored from Target File Column*")
-                    st.sidebar.markdown('</div>', unsafe_allow_html=True)
-                    continue
-                dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
+                else:
+                    dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
+                # Close the station perimeter boundary
                 st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
 # Generate target structures dynamically
@@ -438,7 +440,7 @@ with tab1:
         
         st.markdown("<hr>", unsafe_allow_html=True)
         
-        # MANDATED CHANGE: Target Metric Summary moved exactly to the bottom of the page
+        # Target Metric Summary perfectly aligned at the bottom of the page
         st.markdown(f"### 🏁 Executive Target Summary ({res['scen_label']})")
         m_col1, m_col2, m_col3 = st.columns(3)
         with m_col1:
