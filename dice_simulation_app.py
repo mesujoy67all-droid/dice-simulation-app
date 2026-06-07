@@ -128,7 +128,18 @@ if capacity_mode == "Random Generation":
         if m == 'A' and activate_choke_release and choke_target_station:
             st.sidebar.caption("Station A Range: *Mirrored from Target*")
             continue
-        dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
+        
+        # --- SEPARATED DICE RANGE SELECTION ---
+        st.sidebar.write(f"**Workstation {m} Capacity Bounds**")
+        c1, c2 = st.sidebar.columns(2)
+        with c1:
+            min_val = c1.number_input(f"Min Roll ({m})", min_value=1, max_value=20, value=1, key=f"min_{m}")
+        with c2:
+            max_val = c2.number_input(f"Max Roll ({m})", min_value=1, max_value=20, value=6, key=f"max_{m}")
+        
+        if min_val > max_val:
+            st.sidebar.error(f"Error: Min cannot exceed Max for {m}!")
+        dice_configs[m] = (min_val, max_val)
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500)
     num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=7)
@@ -170,7 +181,18 @@ else:
                 if m == 'A' and activate_choke_release:
                     st.sidebar.caption("Station A Range: *Mirrored from Target File Column*")
                     continue
-                dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
+                
+                # --- SEPARATED DICE RANGE SELECTION (UPLOAD MODE) ---
+                st.sidebar.write(f"**Station {m} Capacity Bounds**")
+                c1, c2 = st.sidebar.columns(2)
+                with c1:
+                    min_val = c1.number_input(f"Min Roll ({m})", min_value=1, max_value=20, value=1, key=f"min_up_{m}")
+                with c2:
+                    max_val = c2.number_input(f"Max Roll ({m})", min_value=1, max_value=20, value=6, key=f"max_up_{m}")
+                
+                if min_val > max_val:
+                    st.sidebar.error(f"Error: Min cannot exceed Max for {m}!")
+                dice_configs[m] = (min_val, max_val)
 
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
@@ -220,6 +242,18 @@ def calculate_entropy(values):
 
 # --- Simulation Processing Engine ---
 if run_sim_clicked:
+    # Quick verification to make sure no boundaries are reversed
+    bounds_error = False
+    for m in members:
+        if m == 'A' and activate_choke_release:
+            continue
+        if dice_configs[m][0] > dice_configs[m][1]:
+            st.sidebar.error(f"❌ Execution Blocked: Station {m} has a min value greater than its max value.")
+            bounds_error = True
+    
+    if bounds_error:
+        st.stop()
+
     if "Import" in capacity_mode and uploaded_df is None:
         st.sidebar.error("Execution Fault: Please upload an analytical capacity CSV/Excel matrix first!")
     else:
@@ -479,7 +513,6 @@ with tab2:
         
         if rows_b:
             df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
-            # Table B renders clean simplified station identifiers dynamically as headers (A, B, C...)
             st.table(df_table_b)
             
         st.markdown("---")
