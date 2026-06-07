@@ -78,7 +78,6 @@ st.markdown("""
         padding: 10px;
         text-align: center;
         margin-top: 12px;
-        animation: pulse 2s infinite;
     }
     
     /* Utility Tabs formatting overrides */
@@ -195,7 +194,7 @@ if st.sidebar.button("Clear Trial Execution Arrays", use_container_width=True):
     st.session_state.sim_current_day = 1
     st.rerun()
 
-# --- Simulation Compilation Engine Logic ---
+# --- Simulation Compilation Engine Logic (UNTOUCHED) ---
 if run_sim_clicked:
     if "Static" in capacity_mode and uploaded_df is None:
         st.sidebar.error("Halting: Sourcing trace profile absent.")
@@ -208,7 +207,6 @@ if run_sim_clicked:
             df_dice = uploaded_df.copy()
             df_dice.columns = members
         
-        # Apply intermittent down-time constraints
         for m in members:
             freq = station_frequencies.get(m, 1)
             if freq > 1:
@@ -216,7 +214,6 @@ if run_sim_clicked:
                     if (d - 1) % freq != 0:
                         df_dice.at[d, m] = 0
 
-        # High Fidelity Step Tracing Array for HBP Playback Visualizer Engine
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         day_step_logs = {}
         total_fg = 0
@@ -230,7 +227,6 @@ if run_sim_clicked:
             realized_flows = {}
             current_day_wip_before = wip_buffers.copy()
             
-            # Formulate cross-dependent serialization
             for i, m in enumerate(members):
                 roll = rolls[m]
                 if i == 0:
@@ -269,7 +265,6 @@ if run_sim_clicked:
         results_df = pd.DataFrame(history_summary).set_index("Day")
         scen_label = "🔥 Base Case Execution" if is_base_run else f"⚡ Trial Scenario #{history_count}"
         
-        # Save structural metric payload
         avg_tr = total_fg / num_days
         avg_wip = results_df["Daily_Total_WIP"].sum() / num_days
         
@@ -305,9 +300,7 @@ with tab1:
         logs = res["logs"]
         
         st.subheader("🏁 Live Production Flow Execution Controller")
-        st.markdown("Interact with the execution loop directly. Run a single cycle frame stepping block, sequence dynamically, or fast forward across all iterations.")
         
-        # Multi-Speed Interactive Simulation Navigation Layout Control Deck
         c_ctrl1, c_ctrl2, c_ctrl3, c_ctrl4 = st.columns([1.5, 1.5, 2, 3])
         
         with c_ctrl1:
@@ -321,7 +314,6 @@ with tab1:
             jump_day = st.slider("Target Day Index Block Routing:", 1, int(res["max_days"]), int(st.session_state.sim_current_day))
             st.session_state.sim_current_day = jump_day
         with c_ctrl4:
-            # Animation run option loop simulation
             if st.checkbox("⚙️ Trigger Automated Visual Pipeline Playback Stream Loop"):
                 st.session_state.play_is_running = True
             else:
@@ -329,16 +321,14 @@ with tab1:
 
         if st.session_state.play_is_running and st.session_state.sim_current_day < res["max_days"]:
             st.session_state.sim_current_day += 1
-            time.sleep(0.08) # Short cycle break to display updating state transitions
+            time.sleep(0.08)
             st.rerun()
 
-        # Gather context state matrices relative to active operational day step view
         cd = st.session_state.sim_current_day
         day_data = logs[cd]
         
         st.markdown(f"#### 🛰️ Real-Time Line Metrics Framework Status Matrix &mdash; **DAY {cd} OF {res['max_days']}**")
         
-        # Display Harvard Metric telemetry summary
         m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.metric("Simulated System Cycles Out", f"{int(day_data['cumulative_fg'])} Units")
         m_col2.metric("Instant Target Frame Processing Efficiency", f"{round((day_data['cumulative_fg']/cd), 2)} Units / Cycle Day")
@@ -346,22 +336,17 @@ with tab1:
         
         st.markdown("---")
         st.markdown("### 🗺️ Harvard Analytics Process Flow Topology Model Visualizer")
-        st.caption("Active capacity variables represent raw system potential. Realized Yield indicates actual throughput output constraint execution dynamics.")
         
-        # Construct pipeline routing rendering maps dynamically using standard layout columns mapping layout blocks
         f_cols = st.columns([2, 1.2, 2, 1.2, 2, 1.2, 2, 1.2, 2, 1.2, 2, 1.2, 2])
-        
         station_letters = [chr(65 + k) for k in range(7)]
         
         for idx, letter in enumerate(station_letters):
             col_pos = idx * 2
             
-            # Processing Station Component Node Rendering Block Elements
             with f_cols[col_pos]:
                 roll_val = day_data["rolls"][letter]
                 flow_val = day_data["flows"][letter]
                 
-                # Highlight starved nodes if realized flow drops below roll potential
                 is_starved = "border-top: 4px solid #EF4444; background: #FFF5F5;" if (flow_val < roll_val and idx > 0 and roll_val > 0) else ""
                 
                 st.markdown(f"""
@@ -373,13 +358,11 @@ with tab1:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Buffer Capacity Storage Render Elements
             if idx < len(station_letters) - 1:
                 next_letter = station_letters[idx+1]
                 b_key = f"WIP_{letter}{next_letter}"
                 wip_val = day_data["wip_end"][b_key]
                 
-                # Check buffer asset constraints
                 buffer_class = "queue-card-starved" if wip_val == 0 else "queue-card-normal"
                 
                 with f_cols[col_pos + 1]:
@@ -393,7 +376,6 @@ with tab1:
         st.markdown("---")
         st.markdown("### 📈 Micro-Trend Inventory Tracking Matrix Profile Lines")
         
-        # Display localized micro charts mapping system accumulation indexes over time scales
         chart_col1, chart_col2 = st.columns(2)
         with chart_col1:
             st.caption("Historical Trendline Asset Footprint Log Line Allocation Matrix (Total Volume)")
@@ -420,4 +402,3 @@ with tab3:
     with st.container(border=True):
         st.markdown("#### Dependency Flow Bounds Governing Constraints")
         st.latex(r"\text{Realized Yield Output}_i = \min\left(\text{Node Design Capacity Capability}_i,\, \text{Input Asset Inventory Level Buffer}_{i-1 \to i}\right)")
-        st.info("💡 **Harvard Business School Takeaway:** System variance within sequentially linked processes propagates downstream. System parameters cannot run smoothly without properly configured inventory safety buffers to protect against capacity starvation bottlenecks.")
