@@ -42,6 +42,7 @@ def auth_gateway():
             if user_id in st.session_state.user_db:
                 if st.session_state.user_db[user_id]["password"] == pwd:
                     st.session_state.authenticated_user = user_id
+                    st.session_state.active_results = None
                     st.rerun()
                 else:
                     st.error("Incorrect password.")
@@ -355,9 +356,6 @@ with tab1:
         c1.metric("Throughput", int(res["total_fg"])) 
         c2.metric("Throughput Rate (TR)", round(res["total_fg"] / res["num_days"], 2))
         c3.metric("Ending WIP Inventory", int(res["final_wip_inventory"])) 
-
-        st.subheader("📈 Performance Trends")
-        st.line_chart(res["results_df"][["Daily_Total_WIP", "Cumulative Throughput"]])
     else:
         st.info("💡 Adjust sidebar parameters and click 'Run & Save Simulation' to load dashboard displays.")
 
@@ -401,10 +399,8 @@ with tab2:
                     target_station = f"Station {b_label[1]}" 
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == target_station)]
                     if not subset.empty:
-                        total_wip_accumulated = subset["Avg WIP"].values[0] * num_days
-                        if period == "Day-wise Avg WIP": val = total_wip_accumulated / num_days
-                        elif period == "Week-wise Avg WIP": val = total_wip_accumulated / (num_days / 5)
-                        else: val = total_wip_accumulated / (num_days / 20)
+                        # Fixed calculation bug: Average WIP inventory count remains unscaled across time boundaries
+                        val = subset["Avg WIP"].values[0]
                         row_data[b_label] = round(val, 2)
                     else:
                         row_data[b_label] = 0.0
@@ -450,7 +446,6 @@ with tab3:
     st.header("📊 Table A: Summary History")
     col1, col2 = st.columns(2)
     with col1:
-
         st.write("### Throughput Rate ($TR$)")
         st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily Throughput}}{n}")
 
