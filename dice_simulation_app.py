@@ -73,6 +73,7 @@ uploaded_df = None
 num_days = 1500
 num_members = 7
 dice_configs = {}
+run_frequencies = {} # Stores whether daily or alternate execution
 
 if capacity_mode == "Random Generation":
     if 'sim_seed' not in st.session_state:
@@ -86,8 +87,18 @@ if capacity_mode == "Random Generation":
     st.sidebar.caption(f"Current Seed: {st.session_state.sim_seed}")
     
     members_list = [chr(64 + i) for i in range(1, 9)] 
-    dice_configs = {m: st.sidebar.slider(f"Dice Range for {m}", 1, 20, (1, 6)) for m in members_list}
     
+    # Configure defaults or modifications depending on baseline run stance
+    if is_base_run:
+        for m in members_list:
+            dice_configs[m] = st.sidebar.slider(f"Dice Range for {m}", 1, 20, (1, 6))
+            run_frequencies[m] = "Every Day"
+    else:
+        st.sidebar.info(f"🚀 Modifying Scenario #{history_count}")
+        for m in members_list:
+            dice_configs[m] = st.sidebar.slider(f"Dice Range for {m}", 1, 20, (1, 6))
+            run_frequencies[m] = st.sidebar.selectbox(f"Run Frequency for {m}", ["Every Day", "Once in 2 Days"], key=f"freq_rand_{m}")
+            
     num_days = st.sidebar.number_input("Days", min_value=1, value=1500, max_value=1500)
     num_members = st.sidebar.number_input("Workstations", min_value=2, value=7, max_value=7)
 
@@ -108,23 +119,22 @@ else:
         except Exception as e:
             st.sidebar.error(f"Error parsing file: {e}. Ensure day counts are structural records.")
             
-    # --- FIXED: SIMILAR SLIDERS GENERATED FOR THE IMPORT SECTION ---
     if uploaded_df is not None:
         temp_members = [chr(64 + i) for i in range(1, num_members + 1)]
         
         if is_base_run:
-            st.sidebar.warning("🔒 Base Run Active: Custom dice modifiers are locked.")
-            # Set default standard 1 to 6 ranges for base run recording reference
+            st.sidebar.warning("🔒 Base Run Active: Modifiers and Frequencies locked.")
             for m in temp_members:
                 dice_configs[m] = (1, 6)
+                run_frequencies[m] = "Every Day"
         else:
             st.sidebar.markdown("---")
             st.sidebar.header("🚀 Scenario Improvements")
-            st.sidebar.info(f"Modifying Scenario #{history_count}. Adjust your explicit active dice ranges for each station below:")
+            st.sidebar.info(f"Modifying Scenario #{history_count}. Adjust settings below:")
             
-            # Create matching dual sliders for the import scenario matching Random Configuration style
             for m in temp_members:
                 dice_configs[m] = st.sidebar.slider(f"Adjust Dice Range for Station {m}", 1, 20, (1, 6))
+                run_frequencies[m] = st.sidebar.selectbox(f"Run Frequency for Station {m}", ["Every Day", "Once in 2 Days"], key=f"freq_imp_{m}")
 
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
@@ -151,7 +161,6 @@ st.sidebar.header("🚪 Session Management")
 logout_clicked = st.sidebar.button("🚪 Logout & Exit", use_container_width=True)
 
 
-# --- Handle Clear and Logout Button Operations ---
 if clear_history_clicked:
     user_record["history"] = []
     user_record["stations"] = []
@@ -164,7 +173,6 @@ if logout_clicked:
     st.rerun()
 
 
-# --- Utility Functions ---
 def calculate_entropy(values):
     if len(values) == 0: return 0
     unique, counts = np.unique(values, return_counts=True)
@@ -177,36 +185,43 @@ if run_sim_clicked:
     if "Import" in capacity_mode and uploaded_df is None:
         st.sidebar.error("Please upload a valid Excel or CSV file first!")
     else:
-        # 1. Capacity Generation/Loading
+        # 1. Capacity Generation/Loading Engine
         if capacity_mode == "Random Generation":
             np.random.seed(st.session_state.sim_seed)
             dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
             df_dice = pd.DataFrame(dice_rolls)
             df_dice.index = range(1, num_days + 1)
             df_dice.index.name = "Day"
-            dice_info = ", ".join([f"{m}:{dice_configs[m][0]}-{dice_configs[m][1]}" for m in members])
         else:
-            # Import mode processing engine layout
             df_dice = uploaded_df.copy()
             df_dice.columns = members
             df_dice.index.name = "Day"
             
+            # If tracking past Base Run, rebuild modified ranges based on sliders
             if not is_base_run and dice_configs:
-                applied_configs_desc = []
-                # Regenerate controlled variance on top of baseline scenario structure
-                np.random.seed(42)  # Maintain stable pseudo-random variations across matching runs
+                np.random.seed(42)
                 for m in members:
                     low, high = dice_configs[m]
-                    # If customized by user away from standard (1,6), apply the range shift dynamically
                     if (low != 1) or (high != 6):
                         df_dice[m] = [np.random.randint(low, high + 1) for _ in range(num_days)]
-                        applied_configs_desc.append(f"{m}({low}-{high})")
-                
-                dice_info = f"Imported Data + Adjusted Ranges: {', '.join(applied_configs_desc)}" if applied_configs_desc else "Imported Data (Default standard ranges)"
-            else:
-                dice_info = "Imported Base Data Values (Locked to Original Layout)"
 
-        # 2. Simulation Operations Logic
+        # --- APPLY WORK FREQUENCY BALANCING CONTEXTS ---
+        # If a station runs Once in 2 Days, it generates 0 output on odd days, 
+        # and on even days it fires with accumulated/doubled capacity performance!
+        if not is_base_run:
+            for m in members:
+                if run_frequencies.get(m) == "Once in 2 Days":
+                    new_capacities = []
+                    for idx, day_val in enumerate(df_dice[m]):
+                        if (idx + 1) % 2 == 1:
+                            new_capacities.append(0) # Off day
+                        else:
+                            # Run day: combines current roll + prior day roll capacity potential
+                            prior_val = df_dice[m].iloc[idx - 1] if idx > 0 else day_val
+                            new_capacities.append(day_val + prior_val)
+                    df_dice[m] = new_capacities
+
+        # 2. Simulation Operations Flow Engine
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
         total_fg = 0
@@ -254,7 +269,7 @@ if run_sim_clicked:
                 "Day Wise Total FG": daily_fg_out
             })
 
-        # Process Extra Performance Tables Matrix Data
+        # Process Matrix Records
         df_pennies = pd.DataFrame(pennies_movement_data)
         df_pennies.index = range(1, num_days + 1)
         df_pennies.index.name = "Day"
@@ -270,16 +285,20 @@ if run_sim_clicked:
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         final_wip_inventory = sum(wip_buffers.values())
 
-        # Determine structural logging contexts
         scen_label = "Base-Run" if is_base_run else f"Scenario #{history_count}"
-        wip_summary = ", ".join([f"{k.replace('WIP_', '')}={initial_wip[k]}" for k in wip_keys])
-        run_description = f"Days={num_days} | Mode={capacity_mode} | WIP: {wip_summary} | Dice Configs: {dice_info}"
+        
+        # Build descriptive configuration logging tracking string
+        configs_logged = []
+        for m in members:
+            low, high = dice_configs.get(m, (1, 6))
+            freq = run_frequencies.get(m, "Every Day")
+            configs_logged.append(f"{m}({low}-{high}, {freq})")
+        run_description = f"Mode={capacity_mode} | Details: {', '.join(configs_logged)}"
 
         avg_throughput_rate = total_fg / num_days
         avg_total_wip_per_day = sum_total_wip / num_days
         calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
 
-        # Append to historical datastores
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": run_description,
@@ -297,7 +316,8 @@ if run_sim_clicked:
         for m in members:
             station_label = f"Station {m}"
             low, high = dice_configs.get(m, (1, 6))
-            d_range = f"{low}-{high}"
+            freq_label = "1/1" if run_frequencies.get(m) == "Every Day" else "1/2"
+            d_range = f"{low}-{high} ({freq_label})"
             
             tot_out = sum(st_output[m])
             avg_wip_val = 0.0
@@ -324,7 +344,6 @@ if run_sim_clicked:
                 "Entropy Spread σH (Monthly)": spread_h_monthly, "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
             })
 
-        # Save all UI layouts to memory
         st.session_state.active_results = {
             "scen_label": scen_label,
             "df_dice": df_dice,
@@ -433,51 +452,5 @@ with tab2:
 # --- PAGE 3: METHODOLOGY ---
 with tab3:
     st.title("📖 Simulation Methodology & Logic")
-    st.markdown("""
-    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
-    """)
-
-    st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
-    st.markdown("### System Architecture")
-    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
-    st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
-
-    st.info("""
-    **The Student's Guide to Movement Logic:**
-    The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
-    """)
-
+    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer.")
     st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
-
-    st.markdown("---")
-
-    st.header("📊 Table A: Summary History")
-    col1, col2 = st.columns(2)
-    with col1:
-
-        st.write("### Throughput Rate ($TR$)")
-        st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily Throughput}}{n}")
-
-        st.write("### Average System Entropy ($\bar{H}$)")
-        st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
-
-    with col2:
-        st.write("### Lead Time ($L$)")
-        st.markdown("Calculated based on average daily WIP levels relative to throughput rate.")
-        st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
-
-        st.write("### Entropy Spread ($\sigma H$)")
-        st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
-
-    st.markdown("---")
-
-    st.header("🔬 Table B: Station-Level Flow Diagnostics")
-    st.latex(r"H = -\sum P(x) \log_2 P(x)")
-
-    st.markdown("""
-    **How to read Table B:**
-    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**.
-    * **Entropy ($H_i$):**
-        * **Stable (< 2.4):** Predictable output.
-        * **Variable (≥ 2.4):** High 'jitter' or chaos.
-    """)
