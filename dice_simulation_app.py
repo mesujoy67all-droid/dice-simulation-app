@@ -19,7 +19,8 @@ st.markdown("""
     div[data-testid="stMetricLabel"] { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
     .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
     .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-    .station-box { border: 1px solid #CBD5E1; border-radius: 8px; padding: 12px; margin-bottom: 10px; background-color: #F8FAFC; }
+    /* Bordered container styling for station sliders */
+    .station-box { border: 1px solid #CBD5E1; padding: 12px; border-radius: 8px; margin-bottom: 10px; background-color: #F8FAFC; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -125,15 +126,16 @@ if capacity_mode == "Random Generation":
             choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
-    st.sidebar.markdown("<br><b>Operational Ranges:</b>", unsafe_allow_html=True)
+    st.sidebar.markdown("<br>", unsafe_allow_html=True)
     for m in members_list[:7]: # Default to 7 workstations
-        with st.sidebar.container():
-            st.markdown(f'<div class="station-box">', unsafe_allow_html=True)
-            if m == 'A' and activate_choke_release and choke_target_station:
-                st.caption("Station A Range: *Mirrored from Target*")
-            else:
-                dice_configs[m] = st.slider(f"Workstation {m}", 1, 20, (1, 6))
-            st.markdown('</div>', unsafe_allow_html=True)
+        # Wrap each slider section in a clean bordered box
+        st.sidebar.markdown(f'<div class="station-box">', unsafe_allow_html=True)
+        if m == 'A' and activate_choke_release and choke_target_station:
+            st.sidebar.caption("Station A Range: *Mirrored from Target*")
+            st.sidebar.markdown('</div>', unsafe_allow_html=True)
+            continue
+        dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
+        st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500)
     num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=7)
@@ -171,15 +173,15 @@ else:
             if activate_choke_release:
                 choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in temp_members if m != 'A'])
             
-            st.sidebar.markdown("<br><b>Operational Ranges:</b>", unsafe_allow_html=True)
+            st.sidebar.markdown("<br>", unsafe_allow_html=True)
             for m in temp_members:
-                with st.sidebar.container():
-                    st.markdown(f'<div class="station-box">', unsafe_allow_html=True)
-                    if m == 'A' and activate_choke_release:
-                        st.sidebar.caption("Station A Range: *Mirrored from Target File Column*")
-                    else:
-                        dice_configs[m] = st.slider(f"Station {m}", 1, 20, (1, 6))
-                    st.markdown('</div>', unsafe_allow_html=True)
+                st.sidebar.markdown(f'<div class="station-box">', unsafe_allow_html=True)
+                if m == 'A' and activate_choke_release:
+                    st.sidebar.caption("Station A Range: *Mirrored from Target File Column*")
+                    st.sidebar.markdown('</div>', unsafe_allow_html=True)
+                    continue
+                dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
+                st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
@@ -443,9 +445,9 @@ with tab1:
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(res["results_df"], use_container_width=True)
         
-        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("<br><hr>", unsafe_allow_html=True)
 
-        # MANDATED CHANGE: Target yields summary moved exclusively to the bottom of Page 1
+        # MANDATED: Moved Summary Section explicitly to the bottom of the page
         st.markdown(f"### 🏁 Executive Target Summary ({res['scen_label']})")
         m_col1, m_col2, m_col3 = st.columns(3)
         with m_col1:
@@ -454,6 +456,7 @@ with tab1:
             st.metric(label="System Throughput Rate (TR)", value=f"{round(res['total_fg'] / res['num_days'], 2)} units/day", delta=None)
         with m_col3:
             st.metric(label="Terminating WIP Stockpile", value=f"{int(res['final_wip_inventory'])} units", delta=None)
+            
     else:
         st.markdown("""
             <div style="background-color: #EFF6FF; border-left: 5px solid #3B82F6; padding: 1.5rem; border-radius: 4px; margin-top: 2rem;">
