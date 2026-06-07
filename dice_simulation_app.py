@@ -59,7 +59,7 @@ if 'active_results' not in st.session_state:
 # --- Authentication Gateway ---
 def auth_gateway():
     st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🎲 Dice Simulation Game</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #6B7280;'>Learn Lean Manufacturing & Variability Dynamics through Gamified Factory Running.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #6B7280;'>🎲 Dice Simulation Game.</p>", unsafe_allow_html=True)
     
     col_l, col_c, col_r = st.columns([1, 1.5, 1])
     with col_c:
