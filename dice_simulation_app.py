@@ -48,7 +48,6 @@ if 'active_results' not in st.session_state:
 
 # --- Authentication Gateway ---
 def auth_gateway():
-    # Centered layout structure for a premium portal look
     _, col_center, _ = st.columns([1, 1.5, 1])
     
     with col_center:
