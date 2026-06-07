@@ -1,3 +1,10 @@
+Here is the updated code. To make it much easier for students to separate and configure each station in the sidebar without getting lost, I have wrapped each station's inputs inside a distinct, visually isolated card container (`st.sidebar.container(border=True)`).
+
+This acts as a clean structural partition on the user interface, separating the stations with clear borders and bold headers.
+
+Here is your updated script:
+
+```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -130,11 +137,13 @@ if capacity_mode == "Random Generation":
     st.sidebar.markdown("### 🎲 Dice Capacity Allocations")
     members_list = [chr(64 + i) for i in range(1, 8)] # Dynamic Generation targeting 7 standard stations
     
+    # --- STATION PARTITIONS (RANDOM GENERATION MODE) ---
     for m in members_list:
-        with st.sidebar.expander(f"Station {m} Parameters", expanded=False):
-            dice_configs[m] = st.sidebar.slider(f"Dice Range:", 1, 20, (1, 6), key=f"range_{m}")
+        with st.sidebar.container(border=True):
+            st.markdown(f"#### ⚙️ Station {m}")
+            dice_configs[m] = st.slider(f"Dice Range:", 1, 20, (1, 6), key=f"range_{m}")
             if not is_base_run:
-                station_frequencies[m] = st.sidebar.selectbox(
+                station_frequencies[m] = st.selectbox(
                     f"Operational Interval:", 
                     list(range(1, 31)), 
                     index=0, 
@@ -144,7 +153,7 @@ if capacity_mode == "Random Generation":
             else:
                 station_frequencies[m] = 1 
 
-    # Editable day counts enabled
+    st.sidebar.markdown("---")
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500)
     num_members = 7
 
@@ -175,8 +184,10 @@ else:
                 station_frequencies[m] = 1
         else:
             st.sidebar.markdown("### 🚀 Dynamic Upgrades")
+            # --- STATION PARTITIONS (IMPORT FILE SCENARIO MODE) ---
             for m in temp_members:
-                with st.sidebar.expander(f"Station {m} Calibration", expanded=False):
+                with st.sidebar.container(border=True):
+                    st.markdown(f"#### 🚀 Station {m} Calibration")
                     dice_configs[m] = st.slider(f"Range Modifier:", 1, 20, (1, 6), key=f"up_range_{m}")
                     station_frequencies[m] = st.selectbox(
                         f"Frequency Matrix:", 
@@ -512,3 +523,5 @@ with tab3:
             
             st.markdown("#### Entropy Spread System Metric ($\sigma H$)")
             st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
+
+```
