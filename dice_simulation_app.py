@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS Styling for Premium Institutional Theme & Borders ---
+# --- CSS Styling for Premium Theme & Grouped Sidebar Containers ---
 st.markdown("""
     <style>
     .main .block-container { padding-top: 2rem; }
@@ -20,21 +20,13 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
     .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
     
-    /* Section and Station Border Styling */
-    .section-container {
-        border: 1px solid #CBD5E1; 
-        padding: 15px; 
-        border-radius: 8px; 
-        background-color: #F8FAFC; 
-        margin-bottom: 15px;
-    }
-    .station-box {
-        border: 1px solid #E2E8F0;
-        padding: 10px 14px;
-        border-radius: 6px;
-        background-color: #FFFFFF;
-        margin-bottom: 8px;
-        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    /* Custom Bordered Box for Sidebar Station Sliders */
+    .station-config-box {
+        border: 1px solid #CBD5E1;
+        border-radius: 8px;
+        padding: 12px;
+        background-color: #F8FAFC;
+        margin-bottom: 12px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -135,25 +127,22 @@ if capacity_mode == "Random Generation":
     
     # "Release the Choke" Configuration for Scenario Runs
     if not is_base_run:
-        st.sidebar.markdown('<div class="section-container">', unsafe_allow_html=True)
         st.sidebar.subheader("🚨 Intervention Control Room")
         activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
         if activate_choke_release:
             choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
-        st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
-    st.sidebar.markdown('<div class="section-container">', unsafe_allow_html=True)
-    st.sidebar.subheader("🎲 Station Capacity Configuration")
-    for m in members_list[:7]: # Default to 7 workstations
-        st.sidebar.markdown(f'<div class="station-box">', unsafe_allow_html=True)
+    # Render bordered containers around each slider config block
+    for m in members_list[:7]: 
+        st.sidebar.markdown(f'<div class="station-config-box">', unsafe_allow_html=True)
         if m == 'A' and activate_choke_release and choke_target_station:
-            st.sidebar.caption("Station A Range: *Mirrored from Target*")
+            st.sidebar.caption("⚡ **Workstation A Parameters**")
+            st.sidebar.caption("Operational Range: *Mirrored from Target Station*")
             st.sidebar.markdown('</div>', unsafe_allow_html=True)
             continue
-        dice_configs[m] = st.sidebar.slider(f"Workstation {m}", 1, 20, (1, 6))
+        dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
         st.sidebar.markdown('</div>', unsafe_allow_html=True)
-    st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500)
     num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=7)
@@ -183,7 +172,7 @@ else:
             for m in temp_members:
                 dice_configs[m] = (1, 6)
         else:
-            st.sidebar.markdown('<div class="section-container">', unsafe_allow_html=True)
+            st.sidebar.markdown("---")
             st.sidebar.header("🚀 Scenario Interventions")
             st.sidebar.info(f"Configuring Interactive Scenario Expansion #{history_count}. Adjust parameters below:")
             
@@ -192,14 +181,14 @@ else:
                 choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in temp_members if m != 'A'])
             
             for m in temp_members:
-                st.sidebar.markdown(f'<div class="station-box">', unsafe_allow_html=True)
+                st.sidebar.markdown(f'<div class="station-config-box">', unsafe_allow_html=True)
                 if m == 'A' and activate_choke_release:
-                    st.sidebar.caption("Station A Range: *Mirrored from Target File Column*")
+                    st.sidebar.caption("⚡ **Workstation A Parameters**")
+                    st.sidebar.caption("Operational Range: *Mirrored from Target File Column*")
                     st.sidebar.markdown('</div>', unsafe_allow_html=True)
                     continue
                 dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
                 st.sidebar.markdown('</div>', unsafe_allow_html=True)
-            st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
@@ -207,10 +196,8 @@ wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
 # SECTION 2: WIP INITIALIZATION
 st.sidebar.markdown("---")
-st.sidebar.markdown('<div class="section-container">', unsafe_allow_html=True)
 st.sidebar.header("📦 Line-Stock WIP Initialization")
 initial_wip = {k: st.sidebar.number_input(f"Initial Buffer {k.replace('WIP_', '')}", min_value=0, value=4) for k in wip_keys}
-st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
 # SECTION 3: SIMULATION EXECUTION (MAIN BUTTON PLACE)
 st.sidebar.markdown("---")
@@ -465,9 +452,9 @@ with tab1:
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(res["results_df"], use_container_width=True)
         
-        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 2rem 0;'>", unsafe_allow_html=True)
 
-        # MANDATED CHANGE: Placed Target Summary Matrix at the bottom of the dashboard page view
+        # REPOSITIONED: Executive Target Summary cards moved to the bottom of Page 1
         st.markdown(f"### 🏁 Executive Target Summary ({res['scen_label']})")
         m_col1, m_col2, m_col3 = st.columns(3)
         with m_col1:
