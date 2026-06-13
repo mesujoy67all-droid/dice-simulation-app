@@ -14,49 +14,52 @@ st.set_page_config(
 # --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
     <style>
-    /* 1. Global text readability */
-    html, body, [class*="css"], [class*="st-"] {
-        font-size: 18px !important;
+    /* 1. Force Black Text & Increased Base Size */
+    .stApp, .stApp * {
+        font-family: sans-serif !important;
+        font-size: 16px !important;
         color: #000000 !important;
     }
-    
-    /* 2. Sidebar visibility */
+
+    /* 2. Sidebar Overhaul */
     section[data-testid="stSidebar"] {
-        background-color: #f8fafc;
+        background-color: #f1f5f9;
+        padding-top: 1rem;
     }
-    .stSidebar [data-testid="stText"], .stSidebar label, .stSidebar div {
+    .stSidebar label, .stSidebar div[data-testid="stText"] {
         font-size: 17px !important;
-        font-weight: 700 !important;
-        color: #000000 !important;
-    }
-    
-    /* 3. Table and Dataframe clarity */
-    .stDataFrame, .stTable {
-        font-size: 18px !important;
-        border: 2px solid #000000 !important;
-    }
-    .stDataFrame th, .stTable th {
-        font-size: 19px !important;
-        background-color: #e2e8f0 !important;
-        color: #000000 !important;
-        font-weight: 900 !important;
-    }
-    .stDataFrame td, .stTable td {
-        font-size: 18px !important;
-        color: #000000 !important;
-    }
-    
-    /* 4. Headers and Metrics */
-    h1, h2, h3, h4 { color: #000000 !important; font-weight: 900 !important; }
-    div[data-testid="stMetricValue"] { 
-        font-size: 3rem !important; 
-        color: #000000 !important; 
-    }
-    div[data-testid="stMetricLabel"] { 
-        font-size: 1.2rem !important; 
-        color: #333333 !important; 
         font-weight: 800 !important;
+        color: #000000 !important;
+        margin-bottom: 5px !important;
     }
+
+    /* 3. Dataframe/Table Visibility - CRITICAL FOR READABILITY */
+    div[data-testid="stDataFrame"], div[data-testid="stTable"] {
+        border: 2px solid #000000 !important;
+        padding: 5px;
+    }
+    /* Increase font inside cells */
+    div[data-testid="stDataFrame"] div[role="gridcell"], 
+    div[data-testid="stDataFrame"] div[role="columnheader"] {
+        font-size: 18px !important;
+        color: #000000 !important;
+        font-weight: 600 !important;
+    }
+
+    /* 4. Executive Summary Metrics */
+    div[data-testid="stMetricValue"] {
+        font-size: 2.5rem !important;
+        font-weight: 900 !important;
+        color: #000000 !important;
+    }
+    div[data-testid="stMetricLabel"] {
+        font-size: 1.1rem !important;
+        font-weight: 800 !important;
+        color: #333333 !important;
+    }
+
+    /* 5. Header adjustments */
+    h1, h2, h3 { color: #000000 !important; font-weight: 900 !important; }
     </style>
 """, unsafe_allow_html=True)
 
