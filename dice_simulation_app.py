@@ -92,8 +92,7 @@ st.sidebar.markdown(f"<div style='background-color:#1E3A8A; padding:10px; border
 
 # SECTION 1: CAPACITY INPUT CONFIGURATION
 st.sidebar.markdown("---")
-st.sidebar.header("⚙️ Capacity Configuration")
-capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
+st.sidebar.header("⚙️ Capacity Range")
 
 # Initialize dynamic operational variables
 uploaded_df = None
@@ -130,8 +129,8 @@ if capacity_mode == "Random Generation":
             continue
         dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
 
-    num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500)
-    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=7)
+    num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=3000)
+    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=9)
 
 else:
     uploaded_file = st.sidebar.file_uploader("Upload operational 'Table of Dice Rolls' data source", type=["xlsx", "xls", "csv"])
@@ -175,6 +174,10 @@ else:
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
+
+st.sidebar.markdown("---")
+st.sidebar.header("⚙️ Capacity Input Mode")
+capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
 
 # SECTION 2: WIP INITIALIZATION
 st.sidebar.markdown("---")
