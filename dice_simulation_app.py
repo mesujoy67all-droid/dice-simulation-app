@@ -14,52 +14,11 @@ st.set_page_config(
 # --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
     <style>
-    /* 1. Force Black Text & Increased Base Size */
-    .stApp, .stApp * {
-        font-family: sans-serif !important;
-        font-size: 16px !important;
-        color: #000000 !important;
-    }
-
-    /* 2. Sidebar Overhaul */
-    section[data-testid="stSidebar"] {
-        background-color: #f1f5f9;
-        padding-top: 1rem;
-    }
-    .stSidebar label, .stSidebar div[data-testid="stText"] {
-        font-size: 17px !important;
-        font-weight: 800 !important;
-        color: #000000 !important;
-        margin-bottom: 5px !important;
-    }
-
-    /* 3. Dataframe/Table Visibility - CRITICAL FOR READABILITY */
-    div[data-testid="stDataFrame"], div[data-testid="stTable"] {
-        border: 2px solid #000000 !important;
-        padding: 5px;
-    }
-    /* Increase font inside cells */
-    div[data-testid="stDataFrame"] div[role="gridcell"], 
-    div[data-testid="stDataFrame"] div[role="columnheader"] {
-        font-size: 18px !important;
-        color: #000000 !important;
-        font-weight: 600 !important;
-    }
-
-    /* 4. Executive Summary Metrics */
-    div[data-testid="stMetricValue"] {
-        font-size: 2.5rem !important;
-        font-weight: 900 !important;
-        color: #000000 !important;
-    }
-    div[data-testid="stMetricLabel"] {
-        font-size: 1.1rem !important;
-        font-weight: 800 !important;
-        color: #333333 !important;
-    }
-
-    /* 5. Header adjustments */
-    h1, h2, h3 { color: #000000 !important; font-weight: 900 !important; }
+    .main .block-container { padding-top: 2rem; }
+    div[data-testid="stMetricValue"] { font-size: 2.2rem; font-weight: 700; color: #1E3A8A; }
+    div[data-testid="stMetricLabel"] { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
+    .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
     </style>
 """, unsafe_allow_html=True)
 
