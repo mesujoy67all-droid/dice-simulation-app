@@ -14,27 +14,37 @@ st.set_page_config(
 # --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
     <style>
-    /* Increase base font size for the entire app */
-    html, body, [class*="st-"] {
-        font-size: 17px !important;
-    }
-
-    /* Boost font size for DataFrames and Tables specifically */
-    .stDataFrame, .stTable {
-        font-size: 16px !important;
-    }
-
-    /* Ensure Headers are distinct and scaled */
-    h1 { font-size: 2.8rem !important; color: #1E3A8A; }
-    h2 { font-size: 2.2rem !important; color: #1E3A8A; }
-    h3 { font-size: 1.8rem !important; color: #334155; }
-
-    /* Enhance Metric Cards */
-    div[data-testid="stMetricValue"] { font-size: 2.8rem !important; font-weight: 800; color: #1E3A8A; }
-    div[data-testid="stMetricLabel"] { font-size: 1.1rem !important; font-weight: 700; text-transform: uppercase; }
+    /* Global Font and Contrast Adjustments */
+    .stApp { font-size: 1.1rem; color: #1e293b; }
+    h1, h2, h3 { color: #0f172a !important; font-weight: 800 !important; }
     
-    /* Improve Card spacing */
-    .auth-card { padding: 3rem !important; border-radius: 16px !important; }
+    /* Metrics Enhancements */
+    div[data-testid="stMetricValue"] { 
+        font-size: 2.8rem !important; 
+        font-weight: 800 !important; 
+        color: #0f172a !important; 
+    }
+    div[data-testid="stMetricLabel"] { 
+        font-size: 1.1rem !important; 
+        font-weight: 700 !important; 
+        color: #475569 !important; 
+    }
+    
+    /* Table Legibility */
+    .stDataFrame, .stTable { 
+        font-size: 1.1rem !important; 
+        border: 1px solid #cbd5e1; 
+    }
+    th { background-color: #f1f5f9 !important; color: #0f172a !important; }
+    
+    /* Sidebar Text */
+    section[data-testid="stSidebar"] { font-size: 1.1rem; }
+    .stSidebar [data-testid="stText"], .stSidebar label { font-size: 1.05rem !important; font-weight: 600; }
+    
+    /* Tab Headers */
+    .stTabs [data-baseweb="tab"] { font-size: 1.3rem !important; font-weight: 700 !important; }
+    
+    .auth-card { background-color: #FFFFFF; border: 2px solid #cbd5e1; padding: 2.5rem; border-radius: 12px; }
     </style>
 """, unsafe_allow_html=True)
 
