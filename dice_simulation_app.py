@@ -14,37 +14,49 @@ st.set_page_config(
 # --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
     <style>
-    /* Global Font and Contrast Adjustments */
-    .stApp { font-size: 1.1rem; color: #1e293b; }
-    h1, h2, h3 { color: #0f172a !important; font-weight: 800 !important; }
+    /* 1. Global text readability */
+    html, body, [class*="css"], [class*="st-"] {
+        font-size: 18px !important;
+        color: #000000 !important;
+    }
     
-    /* Metrics Enhancements */
+    /* 2. Sidebar visibility */
+    section[data-testid="stSidebar"] {
+        background-color: #f8fafc;
+    }
+    .stSidebar [data-testid="stText"], .stSidebar label, .stSidebar div {
+        font-size: 17px !important;
+        font-weight: 700 !important;
+        color: #000000 !important;
+    }
+    
+    /* 3. Table and Dataframe clarity */
+    .stDataFrame, .stTable {
+        font-size: 18px !important;
+        border: 2px solid #000000 !important;
+    }
+    .stDataFrame th, .stTable th {
+        font-size: 19px !important;
+        background-color: #e2e8f0 !important;
+        color: #000000 !important;
+        font-weight: 900 !important;
+    }
+    .stDataFrame td, .stTable td {
+        font-size: 18px !important;
+        color: #000000 !important;
+    }
+    
+    /* 4. Headers and Metrics */
+    h1, h2, h3, h4 { color: #000000 !important; font-weight: 900 !important; }
     div[data-testid="stMetricValue"] { 
-        font-size: 2.8rem !important; 
-        font-weight: 800 !important; 
-        color: #0f172a !important; 
+        font-size: 3rem !important; 
+        color: #000000 !important; 
     }
     div[data-testid="stMetricLabel"] { 
-        font-size: 1.1rem !important; 
-        font-weight: 700 !important; 
-        color: #475569 !important; 
+        font-size: 1.2rem !important; 
+        color: #333333 !important; 
+        font-weight: 800 !important;
     }
-    
-    /* Table Legibility */
-    .stDataFrame, .stTable { 
-        font-size: 1.1rem !important; 
-        border: 1px solid #cbd5e1; 
-    }
-    th { background-color: #f1f5f9 !important; color: #0f172a !important; }
-    
-    /* Sidebar Text */
-    section[data-testid="stSidebar"] { font-size: 1.1rem; }
-    .stSidebar [data-testid="stText"], .stSidebar label { font-size: 1.05rem !important; font-weight: 600; }
-    
-    /* Tab Headers */
-    .stTabs [data-baseweb="tab"] { font-size: 1.3rem !important; font-weight: 700 !important; }
-    
-    .auth-card { background-color: #FFFFFF; border: 2px solid #cbd5e1; padding: 2.5rem; border-radius: 12px; }
     </style>
 """, unsafe_allow_html=True)
 
