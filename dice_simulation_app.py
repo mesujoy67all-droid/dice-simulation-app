@@ -14,11 +14,27 @@ st.set_page_config(
 # --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
     <style>
-    .main .block-container { padding-top: 2rem; }
-    div[data-testid="stMetricValue"] { font-size: 2.2rem; font-weight: 700; color: #1E3A8A; }
-    div[data-testid="stMetricLabel"] { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
-    .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+    /* Increase base font size for the entire app */
+    html, body, [class*="st-"] {
+        font-size: 17px !important;
+    }
+
+    /* Boost font size for DataFrames and Tables specifically */
+    .stDataFrame, .stTable {
+        font-size: 16px !important;
+    }
+
+    /* Ensure Headers are distinct and scaled */
+    h1 { font-size: 2.8rem !important; color: #1E3A8A; }
+    h2 { font-size: 2.2rem !important; color: #1E3A8A; }
+    h3 { font-size: 1.8rem !important; color: #334155; }
+
+    /* Enhance Metric Cards */
+    div[data-testid="stMetricValue"] { font-size: 2.8rem !important; font-weight: 800; color: #1E3A8A; }
+    div[data-testid="stMetricLabel"] { font-size: 1.1rem !important; font-weight: 700; text-transform: uppercase; }
+    
+    /* Improve Card spacing */
+    .auth-card { padding: 3rem !important; border-radius: 16px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -82,11 +98,18 @@ if st.session_state.authenticated_user is None:
 # --- Access Current User's Data ---
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
+
+# Determine history count to check current state
 history_count = len(user_record["history"])
 is_base_run = (history_count == 0)
 
 # --- Sidebar: User Controls & Settings ---
 st.sidebar.markdown(f"<div style='background-color:#1E3A8A; padding:10px; border-radius:6px; color:white; text-align:center; font-weight:bold;'>👤 ACTIVE SESSION: {current_user.upper()}</div>", unsafe_allow_html=True)
+
+# SECTION 1: CAPACITY INPUT CONFIGURATION
+st.sidebar.markdown("---")
+st.sidebar.header("⚙️ Capacity Input Mode")
+capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
 
 # Initialize dynamic operational variables
 uploaded_df = None
@@ -96,23 +119,20 @@ dice_configs = {}
 choke_target_station = None
 activate_choke_release = False
 
-# SECTION 1: CONFIGURATION PARAMETERS (WIP/Stations/Scenario Interventions)
-st.sidebar.markdown("---")
-st.sidebar.header("⚙️ Operational Configuration")
-
-if 'sim_seed' not in st.session_state:
-    st.session_state.sim_seed = None
-
-# We defer the actual logic of these inputs to the mode handling below, 
-# but these variables are defined for scope
-members_list = [chr(64 + i) for i in range(1, 9)]
-
-# --- File Uploader and Manual Configuration Setup ---
-capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
-
 if capacity_mode == "Random Generation":
+    if 'sim_seed' not in st.session_state:
+        st.session_state.sim_seed = None
+
+    keep_seed = st.sidebar.toggle("🔒 Lock Environmental Seed", value=False)
+
+    if not keep_seed:
+        st.session_state.sim_seed = np.random.randint(0, 1000000)
+
+    st.sidebar.caption(f"Active Deterministic Seed: `{st.session_state.sim_seed}`")
+    
     members_list = [chr(64 + i) for i in range(1, 9)] 
     
+    # "Release the Choke" Configuration for Scenario Runs
     if not is_base_run:
         st.sidebar.subheader("🚨 Intervention Control Room")
         activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
@@ -120,7 +140,7 @@ if capacity_mode == "Random Generation":
             choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
-    for m in members_list[:7]: 
+    for m in members_list[:7]: # Default to 7 workstations
         if m == 'A' and activate_choke_release and choke_target_station:
             st.sidebar.caption("Station A Range: *Mirrored from Target*")
             continue
@@ -131,53 +151,56 @@ if capacity_mode == "Random Generation":
 
 else:
     uploaded_file = st.sidebar.file_uploader("Upload operational 'Table of Dice Rolls' data source", type=["xlsx", "xls", "csv"])
+    
     if uploaded_file is not None:
         try:
             if uploaded_file.name.endswith('.csv'):
                 uploaded_df = pd.read_csv(uploaded_file, index_col=0)
             else:
                 uploaded_df = pd.read_excel(uploaded_file, index_col=0)
+            
             uploaded_df = uploaded_df.apply(pd.to_numeric, errors='coerce').fillna(0).astype(int)
             num_days = len(uploaded_df)
             num_members = len(uploaded_df.columns)
             st.sidebar.success(f"📂 Verification Success: {num_days} Days, {num_members} Stations Loaded.")
         except Exception as e:
-            st.sidebar.error(f"Error parsing file: {e}")
+            st.sidebar.error(f"Error parsing file: {e}. Ensure day counts are structural records.")
             
     if uploaded_df is not None:
         temp_members = [chr(64 + i) for i in range(1, num_members + 1)]
+        
         if is_base_run:
-            for m in temp_members: dice_configs[m] = (1, 6)
+            st.sidebar.warning("🔒 Baseline Protection Active: Scenario parameters are locked.")
+            for m in temp_members:
+                dice_configs[m] = (1, 6)
         else:
+            st.sidebar.markdown("---")
+            st.sidebar.header("🚀 Scenario Interventions")
+            st.sidebar.info(f"Configuring Interactive Scenario Expansion #{history_count}. Adjust parameters below:")
+            
             activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
             if activate_choke_release:
                 choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in temp_members if m != 'A'])
+            
             for m in temp_members:
-                if m == 'A' and activate_choke_release: continue
+                if m == 'A' and activate_choke_release:
+                    st.sidebar.caption("Station A Range: *Mirrored from Target File Column*")
+                    continue
                 dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
 
-# Generate target structures
+# Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
-# WIP initialization
+# SECTION 2: WIP INITIALIZATION
+st.sidebar.markdown("---")
+st.sidebar.header("📦 Line-Stock WIP Initialization")
 initial_wip = {k: st.sidebar.number_input(f"Initial Buffer {k.replace('WIP_', '')}", min_value=0, value=4) for k in wip_keys}
 
-# --- NEW SECTION: POSITIONED BEFORE EXECUTION TERMINAL ---
-st.sidebar.markdown("---")
-st.sidebar.header("🧪 Environmental Controls")
-if capacity_mode == "Random Generation":
-    keep_seed = st.sidebar.toggle("🔒 Lock Environmental Seed", value=False)
-    if not keep_seed:
-        st.session_state.sim_seed = np.random.randint(0, 1000000)
-    st.sidebar.caption(f"Active Deterministic Seed: `{st.session_state.sim_seed}`")
-
-# SECTION 3: SIMULATION EXECUTION
+# SECTION 3: SIMULATION EXECUTION (MAIN BUTTON PLACE)
 st.sidebar.markdown("---")
 st.sidebar.header("🚀 Execution Terminal")
 run_sim_clicked = st.sidebar.button("▶ Compile & Execute Trial", use_container_width=True, type="primary")
-
-# ... [The rest of your existing code remains identical below this point] ...
 
 # SECTION 4: DATA MAINTENANCE
 st.sidebar.markdown("---")
@@ -365,7 +388,7 @@ if run_sim_clicked:
         days_per_month = 20
         num_months = int(np.ceil(num_days / days_per_month))
         for m in members:
-            station_label = m 
+            station_label = m  # MANDATED: Simplified identifier format
             low, high = dice_configs.get(m, (1, 6))
             d_range = f"{low}-{high}"
             if m == 'A' and activate_choke_release:
@@ -417,6 +440,8 @@ with tab1:
     
     if st.session_state.active_results is not None:
         res = st.session_state.active_results
+
+        # Metric Presentation Section
         st.markdown(f"### 🏁 Executive Target Summary ({res['scen_label']})")
         m_col1, m_col2, m_col3 = st.columns(3)
         with m_col1:
@@ -425,28 +450,39 @@ with tab1:
             st.metric(label="System Throughput Rate (TR)", value=f"{round(res['total_fg'] / res['num_days'], 2)} units/day", delta=None)
         with m_col3:
             st.metric(label="Terminating WIP Stockpile", value=f"{int(res['final_wip_inventory'])} units", delta=None)
+        
         st.markdown("<hr>", unsafe_allow_html=True)
+
         st.subheader("🎲 Table of Dice Rolls (Capacity Applied)")
         st.dataframe(res["df_dice"], use_container_width=True)
+
         st.subheader("🪙 Day-wise Pennies Movement")
         st.dataframe(res["df_pennies_final"], use_container_width=True)
+
         st.subheader("📦 Work-In-Progress (WIP) History")
         st.dataframe(res["results_df"], use_container_width=True)
     else:
-        st.markdown("""<div style="background-color: #EFF6FF; border-left: 5px solid #3B82F6; padding: 1.5rem; border-radius: 4px; margin-top: 2rem;">
+        st.markdown("""
+            <div style="background-color: #EFF6FF; border-left: 5px solid #3B82F6; padding: 1.5rem; border-radius: 4px; margin-top: 2rem;">
                 <h4 style="color: #1E40AF; margin-top:0;">💡 Terminal Ready for Simulation Run</h4>
                 <p style="color: #1E3A8A; margin-bottom:0;">Configure initial parameters, distribution capacity limits, and buffer sizing targets inside the executive sidebar panel. Click <strong>Run & Save Simulation</strong> to plot current platform analytical data streams.</p>
-            </div>""", unsafe_allow_html=True)
+            </div>
+        """, unsafe_allow_html=True)
 
 with tab2:
     st.markdown("<h2 style='color:#1E3A8A; margin-top:10px;'>📊 Strategic Performance Analytics</h2>", unsafe_allow_html=True)
+    st.write("Compare cross-run scenarios, audit workflow variation variances, and map structural information.")
+    
     if user_record["history"]:
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
         s_df = pd.DataFrame(user_record["stations"])
+
         st.subheader("Table A: Summary History")
         st.table(df_table_a)
+        
         st.markdown("---")
         st.subheader("Table B: Station-Level Flow Diagnostics")
+        
         metrics_to_show = ["Dice Range", "Throughput", "Avg WIP", "Entropy Hi (Monthly Avg)", "Entropy Spread σH (Monthly)", "Interpretation"]
         rows_b = []
         for scen in s_df['Scenario'].unique():
@@ -456,14 +492,18 @@ with tab2:
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
                     row_data[s_label] = subset[metric].values[0] if not subset.empty and metric in subset.columns else "N/A"
                 rows_b.append(row_data)
+        
         if rows_b:
             df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
+            # Table B renders clean simplified station identifiers dynamically as headers (A, B, C...)
             st.table(df_table_b)
+            
         st.markdown("---")
         st.subheader("Table C: Temporal WIP Averages (By Buffer)")
         all_recorded_stations = s_df['Station'].unique()
         recorded_letters = sorted([s for s in all_recorded_stations])
         buffer_labels = [f"{recorded_letters[i]}{recorded_letters[i+1]}" for i in range(len(recorded_letters) - 1)]
+
         rows_c = []
         for scen in s_df['Scenario'].unique():
             for period in ["Day-wise Avg WIP", "Week-wise Avg WIP", "Month-wise Avg WIP"]:
@@ -471,11 +511,17 @@ with tab2:
                 for b_label in buffer_labels:
                     target_station = b_label[1] 
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == target_station)]
-                    row_data[b_label] = round(subset["Avg WIP"].values[0], 2) if not subset.empty else 0.0
+                    if not subset.empty:
+                        val = subset["Avg WIP"].values[0]
+                        row_data[b_label] = round(val, 2)
+                    else:
+                        row_data[b_label] = 0.0
                 rows_c.append(row_data)
+
         if rows_c:
             df_table_c = pd.DataFrame(rows_c).set_index(["Scenario", "Time Metric"])
             st.table(df_table_c)
+            
         st.markdown("---")
         st.subheader("📥 Export Analytics")
         output = io.BytesIO()
@@ -483,7 +529,8 @@ with tab2:
             df_table_a.to_excel(writer, sheet_name='Summary History')
             df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
             df_table_c.reset_index().to_excel(writer, sheet_name='Temporal WIP', index=False)
-        st.download_button(label="Download Full Analytics Excel", data=output.getvalue(), file_name=f"Full_Simulation_{current_user}.xlsx")
+        excel_data = output.getvalue()
+        st.download_button(label="Download Full Analytics Excel", data=excel_data, file_name=f"Full_Simulation_{current_user}.xlsx")
     else:
         st.info("No recorded history found for this User ID.")
 
