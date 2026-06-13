@@ -90,41 +90,23 @@ is_base_run = (history_count == 0)
 # --- Sidebar: User Controls & Settings ---
 st.sidebar.markdown(f"<div style='background-color:#1E3A8A; padding:10px; border-radius:6px; color:white; text-align:center; font-weight:bold;'>👤 ACTIVE SESSION: {current_user.upper()}</div>", unsafe_allow_html=True)
 
-# SECTION 1: CAPACITY INPUT CONFIGURATION
+# --- Sidebar: User Controls & Settings ---
+st.sidebar.markdown(f"<div style='background-color:#1E3A8A; padding:10px; border-radius:6px; color:white; text-align:center; font-weight:bold;'>👤 ACTIVE SESSION: {current_user.upper()}</div>", unsafe_allow_html=True)
+
+# 1. Dice Range & Operational Constraints (KEPT AT TOP)
 st.sidebar.markdown("---")
-st.sidebar.header("⚙️ Capacity Input Mode")
-capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
+st.sidebar.header("⚙️ Operational Constraints")
 
-# Initialize dynamic operational variables
-uploaded_df = None
-num_days = 1500
-num_members = 7
-dice_configs = {}
-choke_target_station = None
-activate_choke_release = False
-
+# Logic to handle Dice Range inputs based on Mode
 if capacity_mode == "Random Generation":
-    if 'sim_seed' not in st.session_state:
-        st.session_state.sim_seed = None
-
-    keep_seed = st.sidebar.toggle("🔒 Lock Environmental Seed", value=False)
-
-    if not keep_seed:
-        st.session_state.sim_seed = np.random.randint(0, 1000000)
-
-    st.sidebar.caption(f"Active Deterministic Seed: `{st.session_state.sim_seed}`")
-    
     members_list = [chr(64 + i) for i in range(1, 9)] 
-    
-    # "Release the Choke" Configuration for Scenario Runs
     if not is_base_run:
         st.sidebar.subheader("🚨 Intervention Control Room")
         activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
         if activate_choke_release:
             choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
-            st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
-
-    for m in members_list[:7]: # Default to 7 workstations
+    
+    for m in members_list[:7]: 
         if m == 'A' and activate_choke_release and choke_target_station:
             st.sidebar.caption("Station A Range: *Mirrored from Target*")
             continue
@@ -181,7 +163,20 @@ st.sidebar.markdown("---")
 st.sidebar.header("📦 Line-Stock WIP Initialization")
 initial_wip = {k: st.sidebar.number_input(f"Initial Buffer {k.replace('WIP_', '')}", min_value=0, value=4) for k in wip_keys}
 
-# SECTION 3: SIMULATION EXECUTION (MAIN BUTTON PLACE)
+# 2. MOVED INPUTS (Now positioned right before Execution Terminal)
+st.sidebar.markdown("---")
+st.sidebar.header("🕹️ Simulation Environment")
+capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
+
+if capacity_mode == "Random Generation":
+    if 'sim_seed' not in st.session_state:
+        st.session_state.sim_seed = None
+    keep_seed = st.sidebar.toggle("🔒 Lock Environmental Seed", value=False)
+    if not keep_seed:
+        st.session_state.sim_seed = np.random.randint(0, 1000000)
+    st.sidebar.caption(f"Active Deterministic Seed: `{st.session_state.sim_seed}`")
+
+# 3. Execution Terminal (STAYS AT BOTTOM)
 st.sidebar.markdown("---")
 st.sidebar.header("🚀 Execution Terminal")
 run_sim_clicked = st.sidebar.button("▶ Compile & Execute Trial", use_container_width=True, type="primary")
