@@ -92,7 +92,8 @@ st.sidebar.markdown(f"<div style='background-color:#1E3A8A; padding:10px; border
 
 # SECTION 1: CAPACITY INPUT CONFIGURATION
 st.sidebar.markdown("---")
-st.sidebar.header("⚙️ Capacity Range")
+st.sidebar.header("⚙️ Capacity Input Mode")
+capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
 
 # Initialize dynamic operational variables
 uploaded_df = None
@@ -174,10 +175,6 @@ else:
 # Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
-
-st.sidebar.markdown("---")
-st.sidebar.header("⚙️ Capacity Input Mode")
-capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
 
 # SECTION 2: WIP INITIALIZATION
 st.sidebar.markdown("---")
