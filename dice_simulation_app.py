@@ -1,4 +1,3 @@
-Python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -12,88 +11,180 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS Styling ---
+# --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
     <style>
     .main .block-container { padding-top: 2rem; }
     div[data-testid="stMetricValue"] { font-size: 2.2rem; font-weight: 700; color: #1E3A8A; }
     div[data-testid="stMetricLabel"] { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
+    .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
     </style>
 """, unsafe_allow_html=True)
 
-# --- Session Initialization ---
-if 'user_db' not in st.session_state: st.session_state.user_db = {} 
-if 'authenticated_user' not in st.session_state: st.session_state.authenticated_user = None
-if 'active_results' not in st.session_state: st.session_state.active_results = None
+# --- User Database Simulation ---
+if 'user_db' not in st.session_state:
+    st.session_state.user_db = {} 
+
+if 'authenticated_user' not in st.session_state:
+    st.session_state.authenticated_user = None
+
+# --- PERSISTENCE STORAGE INITIALIZATION ---
+if 'active_results' not in st.session_state:
+    st.session_state.active_results = None
 
 # --- Authentication Gateway ---
 def auth_gateway():
-    st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🏫 Institutional Executive Simulation Portal</h1>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center; padding: 1.5rem 0;'><h1 style='color: #1E3A8A; margin-bottom: 0.5rem;'>🏫 Institutional Executive Simulation Portal</h1><p style='color: #64748B; font-size:1.1rem;'>Strategic Operations & Assembly Flow Dynamics Engine</p></div>", unsafe_allow_html=True)
+    
     col1, col2, col3 = st.columns([1, 2, 1])
+    
     with col2:
-        auth_mode = st.radio("Select Session Objective:", ["Sign In to Account", "Register New Profile"], horizontal=True)
-        user_id = st.text_input("👤 Operator ID")
-        pwd = st.text_input("🔑 Password", type="password")
+        st.markdown('<div class="auth-card">', unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center; margin-bottom: 1.5rem; color: #334155;'>🔐 Secure Access Terminal</h3>", unsafe_allow_html=True)
+        
+        auth_mode = st.radio("Select Session Objective:", ["Sign In to Account", "Register New Profile"], horizontal=True, label_visibility="collapsed")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        user_id = st.text_input("👤 Operator ID / Username", placeholder="Enter unique ID...")
+        pwd = st.text_input("🔑 Security Password", type="password", placeholder="Enter password...")
+        
+        st.markdown("<hr style='margin: 1.5rem 0;'>", unsafe_allow_html=True)
+        
         if auth_mode == "Register New Profile":
-            if st.button("Configure New Account"):
-                if user_id in st.session_state.user_db: st.error("User ID exists.")
-                else: 
+            st.caption("ℹ️ *Operator IDs are persistent. Please ensure your username is uniquely identifiable.*")
+            if st.button("Configure New Account", use_container_width=True, type="secondary"):
+                if user_id in st.session_state.user_db:
+                    st.error(f"❌ Execution Fault: User ID '{user_id}' is already registered in the database.")
+                elif user_id and pwd:
                     st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": []}
-                    st.success("Profile created.")
-        else:
-            if st.button("Initialize Executive Session"):
-                if user_id in st.session_state.user_db and st.session_state.user_db[user_id]["password"] == pwd:
-                    st.session_state.authenticated_user = user_id
-                    st.rerun()
-                else: st.error("Authentication Failed.")
+                    st.success("✅ Profile successfully committed! Please toggle back to 'Sign In' mode to clear the gate.")
+                else:
+                    st.warning("⚠️ Access Rejected: Credentials cannot contain empty fields.")
+                    
+        elif auth_mode == "Sign In to Account":
+            if st.button("Initialize Executive Session", use_container_width=True, type="primary"):
+                if user_id in st.session_state.user_db:
+                    if st.session_state.user_db[user_id]["password"] == pwd:
+                        st.session_state.authenticated_user = user_id
+                        st.session_state.active_results = None
+                        st.rerun()
+                    else:
+                        st.error("❌ Authentication Failed: Cryptographic mismatch for security password.")
+                else:
+                    st.error("❌ Security Exception: Specified Operator ID was not found.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 if st.session_state.authenticated_user is None:
     auth_gateway()
     st.stop()
 
+# --- Access Current User's Data ---
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
+
+# Determine history count to check current state
 history_count = len(user_record["history"])
 is_base_run = (history_count == 0)
 
-# --- Sidebar Controls ---
-st.sidebar.markdown(f"**👤 ACTIVE SESSION: {current_user.upper()}**")
+# --- Sidebar: User Controls & Settings ---
+st.sidebar.markdown(f"<div style='background-color:#1E3A8A; padding:10px; border-radius:6px; color:white; text-align:center; font-weight:bold;'>👤 ACTIVE SESSION: {current_user.upper()}</div>", unsafe_allow_html=True)
 
-# 1. Operational Constraints (Kept at Top)
+# SECTION 1: CAPACITY INPUT CONFIGURATION
 st.sidebar.markdown("---")
-st.sidebar.header("⚙️ Operational Constraints")
-dice_configs = {}
-members_list = [chr(64 + i) for i in range(1, 9)]
-activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
-choke_target_station = st.sidebar.selectbox("Align Station A to:", [m for m in members_list if m != 'A']) if activate_choke_release else None
-
-for m in members_list[:7]:
-    if m == 'A' and activate_choke_release: continue
-    dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
-
-num_days = st.sidebar.number_input("Simulation Duration (Days)", 1, 3000, 1500)
-num_members = st.sidebar.number_input("Active Processing Stations", 2, 9, 7)
-
-# 2. WIP Initialization
-st.sidebar.markdown("---")
-st.sidebar.header("📦 Line-Stock WIP")
-wip_keys = [f"WIP_{chr(65+i)}{chr(66+i)}" for i in range(num_members-1)]
-initial_wip = {k: st.sidebar.number_input(f"Initial {k}", 0, 100, 4) for k in wip_keys}
-
-# 3. MOVED OPTIONS (Capacity Mode & Seed)
-st.sidebar.markdown("---")
-st.sidebar.header("🕹️ Simulation Environment")
+st.sidebar.header("⚙️ Capacity Input Mode")
 capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
 
-if capacity_mode == "Random Generation":
-    if 'sim_seed' not in st.session_state: st.session_state.sim_seed = np.random.randint(0, 1000000)
-    keep_seed = st.sidebar.toggle("🔒 Lock Environmental Seed", value=False)
-    if not keep_seed: st.session_state.sim_seed = np.random.randint(0, 1000000)
-    st.sidebar.caption(f"Active Seed: `{st.session_state.sim_seed}`")
+# Initialize dynamic operational variables
+uploaded_df = None
+num_days = 1500
+num_members = 7
+dice_configs = {}
+choke_target_station = None
+activate_choke_release = False
 
-# 4. Execution Terminal (Stays at bottom)
+if capacity_mode == "Random Generation":
+    if 'sim_seed' not in st.session_state:
+        st.session_state.sim_seed = None
+
+    keep_seed = st.sidebar.toggle("🔒 Lock Environmental Seed", value=False)
+
+    if not keep_seed:
+        st.session_state.sim_seed = np.random.randint(0, 1000000)
+
+    st.sidebar.caption(f"Active Deterministic Seed: `{st.session_state.sim_seed}`")
+    
+    members_list = [chr(64 + i) for i in range(1, 9)] 
+    
+    # "Release the Choke" Configuration for Scenario Runs
+    if not is_base_run:
+        st.sidebar.subheader("🚨 Intervention Control Room")
+        activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
+        if activate_choke_release:
+            choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
+            st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
+
+    for m in members_list[:7]: # Default to 7 workstations
+        if m == 'A' and activate_choke_release and choke_target_station:
+            st.sidebar.caption("Station A Range: *Mirrored from Target*")
+            continue
+        dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
+
+    num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=3000)
+    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=9)
+
+else:
+    uploaded_file = st.sidebar.file_uploader("Upload operational 'Table of Dice Rolls' data source", type=["xlsx", "xls", "csv"])
+    
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                uploaded_df = pd.read_csv(uploaded_file, index_col=0)
+            else:
+                uploaded_df = pd.read_excel(uploaded_file, index_col=0)
+            
+            uploaded_df = uploaded_df.apply(pd.to_numeric, errors='coerce').fillna(0).astype(int)
+            num_days = len(uploaded_df)
+            num_members = len(uploaded_df.columns)
+            st.sidebar.success(f"📂 Verification Success: {num_days} Days, {num_members} Stations Loaded.")
+        except Exception as e:
+            st.sidebar.error(f"Error parsing file: {e}. Ensure day counts are structural records.")
+            
+    if uploaded_df is not None:
+        temp_members = [chr(64 + i) for i in range(1, num_members + 1)]
+        
+        if is_base_run:
+            st.sidebar.warning("🔒 Baseline Protection Active: Scenario parameters are locked.")
+            for m in temp_members:
+                dice_configs[m] = (1, 6)
+        else:
+            st.sidebar.markdown("---")
+            st.sidebar.header("🚀 Scenario Interventions")
+            st.sidebar.info(f"Configuring Interactive Scenario Expansion #{history_count}. Adjust parameters below:")
+            
+            activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
+            if activate_choke_release:
+                choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in temp_members if m != 'A'])
+            
+            for m in temp_members:
+                if m == 'A' and activate_choke_release:
+                    st.sidebar.caption("Station A Range: *Mirrored from Target File Column*")
+                    continue
+                dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
+
+# Generate target structures dynamically
+members = [chr(64 + i) for i in range(1, num_members + 1)]
+wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
+
+# SECTION 2: WIP INITIALIZATION
 st.sidebar.markdown("---")
-run_sim_clicked = st.sidebar.button("▶ Compile & Execute Trial", type="primary", use_container_width=True)
+st.sidebar.header("📦 Line-Stock WIP Initialization")
+initial_wip = {k: st.sidebar.number_input(f"Initial Buffer {k.replace('WIP_', '')}", min_value=0, value=4) for k in wip_keys}
+
+# SECTION 3: SIMULATION EXECUTION (MAIN BUTTON PLACE)
+st.sidebar.markdown("---")
+st.sidebar.header("🚀 Execution Terminal")
+run_sim_clicked = st.sidebar.button("▶ Compile & Execute Trial", use_container_width=True, type="primary")
 
 # SECTION 4: DATA MAINTENANCE
 st.sidebar.markdown("---")
