@@ -228,6 +228,28 @@ if run_sim_clicked:
             dice_configs['A'] = dice_configs[choke_target_station]
 
         # 1. Capacity Generation/Loading
+        if capacity_mode == "Random Generation":
+            np.random.seed(st.session_state.sim_seed)
+            dice_rolls = {}
+            
+            for m in members:
+                if m == 'A' and activate_choke_release and choke_target_station:
+                    continue 
+                dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
+            
+            if activate_choke_release and choke_target_station:
+                dice_rolls['A'] = list(dice_rolls[choke_target_station])
+                
+            df_dice = pd.DataFrame(dice_rolls)
+            df_dice = df_dice.reindex(columns=members)
+            df_dice.index = range(1, num_days + 1)
+            df_dice.index.name = "Day"
+    else:
+        # Sync configurations if Choke release is chosen
+        if activate_choke_release and choke_target_station:
+            dice_configs['A'] = dice_configs[choke_target_station]
+
+        # 1. Capacity Generation/Loading
        if capacity_mode == "Random Generation":
             np.random.seed(st.session_state.sim_seed)
             dice_rolls = {}
