@@ -125,7 +125,7 @@ if capacity_mode == "Random Generation":
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
     if 'num_members' not in st.session_state:
-        st.session_state.num_members = 9
+        st.session_state.num_members = 7
 
     for m in members_list[:st.session_state.num_members]:
         if m == 'A' and activate_choke_release and choke_target_station:
