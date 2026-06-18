@@ -131,7 +131,7 @@ if capacity_mode == "Random Generation":
         dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=3000)
-    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=9)
+    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=7)
 
 else:
     uploaded_file = st.sidebar.file_uploader("Upload operational 'Table of Dice Rolls' data source", type=["xlsx", "xls", "csv"])
@@ -232,38 +232,11 @@ if run_sim_clicked:
             np.random.seed(st.session_state.sim_seed)
             dice_rolls = {}
             
+            # Populate ranges for all stations first
             for m in members:
                 if m == 'A' and activate_choke_release and choke_target_station:
-                    continue 
+                    continue # Will copy after loop
                 dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
-            
-            if activate_choke_release and choke_target_station:
-                dice_rolls['A'] = list(dice_rolls[choke_target_station])
-                
-            df_dice = pd.DataFrame(dice_rolls)
-            df_dice = df_dice.reindex(columns=members)
-            df_dice.index = range(1, num_days + 1)
-            df_dice.index.name = "Day"
-    else:
-        # Sync configurations if Choke release is chosen
-        if activate_choke_release and choke_target_station:
-            dice_configs['A'] = dice_configs[choke_target_station]
-
-        # 1. Capacity Generation/Loading
-       if capacity_mode == "Random Generation":
-            np.random.seed(st.session_state.sim_seed)
-            dice_rolls = {}
-            
-            # This 'for' loop should be at the same indentation level as the lines above
-            for m in members:
-                # This 'if' should be indented further than the 'for' loop
-                if m == 'A' and activate_choke_release and choke_target_station:
-                    continue 
-                dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
-            
-            # This 'if' (your line 248) must align with the 'for' loop above
-            if activate_choke_release and choke_target_station:
-                dice_rolls['A'] = list(dice_rolls[choke_target_station])
             
             # Apply dynamic Choke Release mirroring if active
             if activate_choke_release and choke_target_station:
