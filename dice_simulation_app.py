@@ -229,8 +229,10 @@ if run_sim_clicked:
 
         # 1. Capacity Generation/Loading
         if capacity_mode == "Random Generation":
-    np.random.seed(st.session_state.sim_seed)
-    dice_rolls = {}
+            # Ensure this line and everything below is indented by 12 spaces 
+            # (or 3 tabs) relative to the left margin
+            np.random.seed(st.session_state.sim_seed) 
+            dice_rolls = {}
     
     for m in members:
         # Safety check: ensure the station exists in configs, default to (1, 6) if missing
