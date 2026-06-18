@@ -124,14 +124,14 @@ if capacity_mode == "Random Generation":
             choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 9])
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
-     for m in members_list[:num_members]: # Default to 7 workstations
+    num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=3000)
+    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=9, max_value=9)
+
+    for m in members_list[:num_members]: # Dynamically match selected station count
         if m == 'A' and activate_choke_release and choke_target_station:
             st.sidebar.caption("Station A Range: *Mirrored from Target*")
             continue
         dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
-
-    num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=3000)
-    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=9)
 
 else:
     uploaded_file = st.sidebar.file_uploader("Upload operational 'Table of Dice Rolls' data source", type=["xlsx", "xls", "csv"])
