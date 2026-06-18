@@ -229,14 +229,18 @@ if run_sim_clicked:
 
         # 1. Capacity Generation/Loading
         if capacity_mode == "Random Generation":
-            np.random.seed(st.session_state.sim_seed)
-            dice_rolls = {}
+    np.random.seed(st.session_state.sim_seed)
+    dice_rolls = {}
+    
+    for m in members:
+        # Safety check: ensure the station exists in configs, default to (1, 6) if missing
+        if m not in dice_configs:
+            dice_configs[m] = (1, 6)
             
-            # Populate ranges for all stations first
-            for m in members:
-                if m == 'A' and activate_choke_release and choke_target_station:
-                    continue # Will copy after loop
-                dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
+        if m == 'A' and activate_choke_release and choke_target_station:
+            continue 
+            
+        dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
             
             # Apply dynamic Choke Release mirroring if active
             if activate_choke_release and choke_target_station:
