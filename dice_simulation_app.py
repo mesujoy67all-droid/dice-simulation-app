@@ -121,7 +121,7 @@ if capacity_mode == "Random Generation":
         st.sidebar.subheader("🚨 Intervention Control Room")
         activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
         if activate_choke_release:
-            choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A')
+            choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A')]
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
     for m in members_list[:num_members]: # Default to 7 workstations
