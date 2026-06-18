@@ -191,6 +191,64 @@ st.markdown("""
         font-size: 0.78rem !important;
         color: #94A3B8 !important;
     }
+      /* Fix metric columns - equal width, proper sizing */
+    div[data-testid="stMetric"] {
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+    div[data-testid="column"] {
+        padding: 0 0.4rem !important;
+    }
+
+    /* Fix main content background */
+    .main > div {
+        background-color: #F0F4FF !important;
+    }
+    section.main {
+        background-color: #F0F4FF !important;
+    }
+
+    /* Fix sidebar label font size and spacing */
+    section[data-testid="stSidebar"] .stSlider label p,
+    section[data-testid="stSidebar"] .stNumberInput label p,
+    section[data-testid="stSidebar"] .stRadio label p,
+    section[data-testid="stSidebar"] .stCheckbox label p {
+        font-size: 0.82rem !important;
+        color: #CBD5E1 !important;
+        line-height: 1.4 !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Sidebar slider track color */
+    section[data-testid="stSidebar"] .stSlider [data-testid="stThumbValue"] {
+        color: #93C5FD !important;
+        font-size: 0.78rem !important;
+        font-weight: 600 !important;
+    }
+
+    /* Fix subheader spacing in sidebar */
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        font-size: 0.82rem !important;
+        color: #94A3B8 !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Active session banner */
+    section[data-testid="stSidebar"] div[style*="background-color:#1E3A8A"] {
+        background: linear-gradient(135deg, #1D4ED8, #7C3AED) !important;
+        font-size: 0.88rem !important;
+        letter-spacing: 1.5px !important;
+    }
+
+    /* Subheader text in main */
+    .stSubheader, [data-testid="stSubheader"] {
+        font-size: 1.05rem !important;
+        font-weight: 700 !important;
+        color: #1E3A8A !important;
+        border-left: 4px solid #2563EB;
+        padding-left: 10px !important;
+        margin-top: 1.5rem !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
