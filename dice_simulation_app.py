@@ -120,7 +120,7 @@ if capacity_mode == "Random Generation":
     if not is_base_run:
         st.sidebar.subheader("🚨 Intervention Control Room")
         activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
-         if activate_choke_release:
+    if activate_choke_release:
             choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 9])
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
