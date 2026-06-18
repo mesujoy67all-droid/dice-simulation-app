@@ -124,11 +124,11 @@ if capacity_mode == "Random Generation":
             choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
-    for m in members_list[:7]: # Default to 7 workstations
-        if m == 'A' and activate_choke_release and choke_target_station:
-            st.sidebar.caption("Station A Range: *Mirrored from Target*")
-            continue
-        dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
+    for m in members: 
+    if m == 'A' and activate_choke_release and choke_target_station:
+        st.sidebar.caption("Station A Range: *Mirrored from Target*")
+        continue
+    dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=3000)
     num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=9)
@@ -235,8 +235,10 @@ if run_sim_clicked:
             # Populate ranges for all stations first
             for m in members:
                 if m == 'A' and activate_choke_release and choke_target_station:
-                    continue # Will copy after loop
-                dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
+                    continue 
+            # Because we updated the sidebar to populate dice_configs for all members,
+            # this line will no longer trigger a KeyError:
+            dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
             
             # Apply dynamic Choke Release mirroring if active
             if activate_choke_release and choke_target_station:
