@@ -316,7 +316,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
 # --- User Database Simulation ---
 if 'user_db' not in st.session_state:
     st.session_state.user_db = {} 
