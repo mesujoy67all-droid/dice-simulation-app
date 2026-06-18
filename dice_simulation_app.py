@@ -5,68 +5,7 @@ from collections import defaultdict
 import io
 
 # --- Page Configuration ---
-st.set_page_config(
-    page_title="Executive Simulation Platform", 
-    page_icon="🎲",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# --- Custom CSS Styling for Premium Executive Simulation Theme ---
-st.markdown("""
-<style>
-    /* Main app canvas background color */
-    .stApp {
-        background-color: #fcfcfc;
-    }
-    
-    /* Global Sidebar Styling Refinements */
-    section[data-testid="stSidebar"] {
-        background-color: #f1f3f5 !important;
-        border-right: 1px solid #e9ecef;
-    }
-    
-    /* Premium Metric Card Styling Overrides */
-    div[data-testid="stMetricValue"] {
-        font-size: 2.2rem;
-        font-weight: 800;
-        color: #8A1538; /* Core Crimson Anchor */
-        font-family: 'Georgia', serif;
-    }
-    div[data-testid="stMetricLabel"] {
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: #2D3748; /* Deep Charcoal */
-        font-size: 0.85rem;
-    }
-    
-    /* Tab Styling Adjustments */
-    .stTabs [data-baseweb="tab"] {
-        font-size: 1.1rem;
-        font-weight: 700;
-        padding-top: 12px;
-        padding-bottom: 12px;
-        color: #4A5568;
-    }
-    .stTabs [aria-selected="true"] {
-        color: #8A1538 !important;
-        border-bottom-color: #8A1538 !important;
-    }
-    
-    /* Classy Alert / Info Banner Adjustments */
-    div[data-testid="stNotification"] {
-        border-left: 5px solid #8A1538 !important;
-        background-color: #fdf2f4;
-    }
-    
-    /* Interactive Button Styling Profiles */
-    div.stButton > button:first-child {
-        border-radius: 6px;
-        font-weight: 600;
-    }
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Dice Simulation Platform", layout="wide")
 
 # --- User Database Simulation ---
 if 'user_db' not in st.session_state:
@@ -81,38 +20,33 @@ if 'active_results' not in st.session_state:
 
 # --- Authentication Gateway ---
 def auth_gateway():
-    st.markdown("<h1 style='text-align: center; color: #8A1538; font-family: Georgia, serif; font-weight: 800;'>🎲 Dice Simulation Suite</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #4A5568; font-size: 1.1rem;'>Strategic Operations & Risk Management Lab</p>", unsafe_allow_html=True)
+    st.title("🔐 Production Simulation Gateway")
+    auth_mode = st.radio("Select Mode:", ["Login", "Signup"], horizontal=True)
     
-    col_l, col_c, col_r = st.columns([1, 1.5, 1])
-    with col_c:
-        with st.container(border=True):
-            auth_mode = st.radio("Select Access Mode:", ["Login", "Signup"], horizontal=True)
-            
-            user_id = st.text_input("User ID (Unique Username)")
-            pwd = st.text_input("Password", type="password")
-            
-            if auth_mode == "Signup":
-                st.caption("💡 Your User ID must be unique. You can only sign up once.")
-                if st.button("🚀 Create Simulation Profile", use_container_width=True):
-                    if user_id in st.session_state.user_db:
-                        st.error(f"User ID '{user_id}' is already taken.")
-                    elif user_id and pwd:
-                        st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": []}
-                        st.success("Account created! Please switch to Login mode.")
-                    else:
-                        st.warning("Fields cannot be empty.")
-                        
-            elif auth_mode == "Login":
-                if st.button("🔑 Sign In to Lab", use_container_width=True):
-                    if user_id in st.session_state.user_db:
-                        if st.session_state.user_db[user_id]["password"] == pwd:
-                            st.session_state.authenticated_user = user_id
-                            st.rerun()
-                        else:
-                            st.error("Incorrect password.")
-                    else:
-                        st.error("User ID not found.")
+    user_id = st.text_input("User ID (Unique Username)")
+    pwd = st.text_input("Password", type="password")
+    
+    if auth_mode == "Signup":
+        st.info("Your User ID must be unique. You can only sign up once.")
+        if st.button("Create Account"):
+            if user_id in st.session_state.user_db:
+                st.error(f"User ID '{user_id}' is already taken.")
+            elif user_id and pwd:
+                st.session_state.user_db[user_id] = {"password": pwd, "history": [], "stations": []}
+                st.success("Account created! Please switch to Login mode.")
+            else:
+                st.warning("Fields cannot be empty.")
+                
+    elif auth_mode == "Login":
+        if st.button("Sign In"):
+            if user_id in st.session_state.user_db:
+                if st.session_state.user_db[user_id]["password"] == pwd:
+                    st.session_state.authenticated_user = user_id
+                    st.rerun()
+                else:
+                    st.error("Incorrect password.")
+            else:
+                st.error("User ID not found.")
 
 if st.session_state.authenticated_user is None:
     auth_gateway()
@@ -122,15 +56,17 @@ if st.session_state.authenticated_user is None:
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
+# Determine history count to check current state
 history_count = len(user_record["history"])
 is_base_run = (history_count == 0)
 
-# --- Sidebar Layout Configuration ---
-st.sidebar.markdown(f"### ⚙️ Engine Controls\n**Lead Engineer:** `{current_user}`")
+# --- Sidebar: User Controls & Settings ---
+st.sidebar.header(f"👤 Active: {current_user}")
 
+# SECTION 1: CAPACITY INPUT CONFIGURATION
 st.sidebar.markdown("---")
-st.sidebar.subheader("🔌 Mode Settings")
-capacity_mode = st.sidebar.radio("Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
+st.sidebar.header("⚙️ Capacity Configuration")
+capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
 
 # Initialize dynamic operational variables
 uploaded_df = None
@@ -141,40 +77,36 @@ station_frequencies = {}
 
 if capacity_mode == "Random Generation":
     if 'sim_seed' not in st.session_state:
-        st.session_state.sim_seed = np.random.randint(0, 1000000)
+        st.session_state.sim_seed = None
 
-    keep_seed = st.sidebar.toggle("🔒 Freeze System Seed (Replication)", value=False)
+    keep_seed = st.sidebar.toggle("🔒 Keep the same seed (for replication)", value=False)
 
     if not keep_seed:
         st.session_state.sim_seed = np.random.randint(0, 1000000)
 
-    st.sidebar.caption(f"Active Seed Value: `{st.session_state.sim_seed}`")
+    st.sidebar.caption(f"Current Seed: {st.session_state.sim_seed}")
     
-    st.sidebar.markdown("### 🎲 Dice Capacity Allocations")
-    members_list = [chr(64 + i) for i in range(1, 8)] # Dynamic Generation targeting 7 standard stations
+    members_list = [chr(64 + i) for i in range(1, 9)] 
     
-    # --- STATION PARTITIONS (RANDOM GENERATION MODE) ---
     for m in members_list:
-        with st.sidebar.container(border=True):
-            st.markdown(f"#### ⚙️ Station {m}")
-            dice_configs[m] = st.slider(f"Dice Range:", 1, 20, (1, 6), key=f"range_{m}")
-            if not is_base_run:
-                station_frequencies[m] = st.selectbox(
-                    f"Operational Interval:", 
-                    list(range(1, 31)), 
-                    index=0, 
-                    format_func=lambda x: "Every Single Day" if x == 1 else f"Once every {x} Days",
-                    key=f"freq_{m}"
-                )
-            else:
-                station_frequencies[m] = 1 
+        dice_configs[m] = st.sidebar.slider(f"Dice Range for {m}", 1, 20, (1, 6))
+        
+        # UPGRADED: Expanded selectbox options list up to 30 days for Random selection layout
+        if not is_base_run:
+            station_frequencies[m] = st.sidebar.selectbox(
+                f"Run Frequency for {m}", 
+                list(range(1, 31)), 
+                index=0, 
+                format_func=lambda x: "Every Day" if x == 1 else f"Once in {x} Days"
+            )
+        else:
+            station_frequencies[m] = 1 
 
-    st.sidebar.markdown("---")
-    num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=1500)
-    num_members = 7
+    num_days = st.sidebar.number_input("Days", min_value=1, value=1500, max_value=1500)
+    num_members = st.sidebar.number_input("Workstations", min_value=2, value=7, max_value=7)
 
 else:
-    uploaded_file = st.sidebar.file_uploader("Upload 'Table of Dice Rolls' File", type=["xlsx", "xls", "csv"])
+    uploaded_file = st.sidebar.file_uploader("Upload your 'Table of Dice Rolls' file", type=["xlsx", "xls", "csv"])
     
     if uploaded_file is not None:
         try:
@@ -186,46 +118,62 @@ else:
             uploaded_df = uploaded_df.apply(pd.to_numeric, errors='coerce').fillna(0).astype(int)
             num_days = len(uploaded_df)
             num_members = len(uploaded_df.columns)
-            st.sidebar.success(f"📂 Structure Loaded! {num_days} Days, {num_members} Stations.")
+            st.sidebar.success(f"📂 Loaded Baseline: {num_days} Days, {num_members} Stations.")
         except Exception as e:
-            st.sidebar.error(f"Error parsing file: {e}")
+            st.sidebar.error(f"Error parsing file: {e}. Ensure day counts are structural records.")
             
     if uploaded_df is not None:
         temp_members = [chr(64 + i) for i in range(1, num_members + 1)]
         
         if is_base_run:
-            st.sidebar.warning("🔒 Base Run Active: System Modifiers Locked.")
+            st.sidebar.warning("🔒 Base Run Active: Custom dice modifiers and intervals are locked.")
             for m in temp_members:
                 dice_configs[m] = (1, 6)
                 station_frequencies[m] = 1
         else:
-            st.sidebar.markdown("### 🚀 Dynamic Upgrades")
-            # --- STATION PARTITIONS (IMPORT FILE SCENARIO MODE) ---
+            st.sidebar.markdown("---")
+            st.sidebar.header("🚀 Scenario Improvements")
+            st.sidebar.info(f"Modifying Scenario #{history_count}. Set custom parameters below:")
+            
             for m in temp_members:
-                with st.sidebar.container(border=True):
-                    st.markdown(f"#### 🚀 Station {m} Calibration")
-                    dice_configs[m] = st.slider(f"Range Modifier:", 1, 20, (1, 6), key=f"up_range_{m}")
+                col1, col2 = st.sidebar.columns(2)
+                with col1:
+                    dice_configs[m] = st.slider(f"Range {m}", 1, 20, (1, 6))
+                with col2:
+                    # UPGRADED: Expanded choice matrix list to select dynamic intervals up to 30 days
                     station_frequencies[m] = st.selectbox(
-                        f"Frequency Matrix:", 
+                        f"Freq {m}", 
                         list(range(1, 31)), 
                         index=0, 
-                        format_func=lambda x: "Daily Flow" if x == 1 else f"1 in {x} Days",
-                        key=f"up_freq_{m}"
+                        format_func=lambda x: "Daily" if x == 1 else f"1 in {x} Days"
                     )
 
-# Target structure parameters
+# Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
+# SECTION 2: WIP INITIALIZATION
 st.sidebar.markdown("---")
-st.sidebar.subheader("📦 Base Buffer Storage (WIP)")
-initial_wip = {k: st.sidebar.number_input(f"Initial Buffer {k.replace('WIP_', '')}:", min_value=0, value=4) for k in wip_keys}
+st.sidebar.header("📦 WIP Initialization")
+initial_wip = {k: st.sidebar.number_input(k, min_value=0, value=4) for k in wip_keys}
 
+# SECTION 3: SIMULATION EXECUTION (MAIN BUTTON PLACE)
 st.sidebar.markdown("---")
-run_sim_clicked = st.sidebar.button("▶️ Execute & Save Run", type="primary", use_container_width=True)
-clear_history_clicked = st.sidebar.button("🗑️ Reset All Scenarios", use_container_width=True)
-logout_clicked = st.sidebar.button("🚪 Exit Simulation Suite", use_container_width=True)
+st.sidebar.header("🚀 Action Console")
+run_sim_clicked = st.sidebar.button("▶ Run & Save Simulation", use_container_width=True)
 
+# SECTION 4: DATA MAINTENANCE
+st.sidebar.markdown("---")
+st.sidebar.header("🧹 Data Maintenance")
+clear_history_clicked = st.sidebar.button("🗑️ Clear Whole History", use_container_width=True)
+
+# SECTION 5: ACCOUNT PORTAL
+st.sidebar.markdown("---")
+st.sidebar.header("🚪 Session Management")
+logout_clicked = st.sidebar.button("🚪 Logout & Exit", use_container_width=True)
+
+
+# --- Handle Clear and Logout Button Operations ---
 if clear_history_clicked:
     user_record["history"] = []
     user_record["stations"] = []
@@ -237,18 +185,21 @@ if logout_clicked:
     st.session_state.active_results = None
     st.rerun()
 
-# --- Calculation Utilities ---
+
+# --- Utility Functions ---
 def calculate_entropy(values):
     if len(values) == 0: return 0
     unique, counts = np.unique(values, return_counts=True)
     p = counts / counts.sum()
     return -np.sum(p * np.log2(p))
 
-# --- Processing Engine ---
+
+# --- Simulation Processing Engine ---
 if run_sim_clicked:
     if "Import" in capacity_mode and uploaded_df is None:
-        st.sidebar.error("Please drop an Excel/CSV structure profile first!")
+        st.sidebar.error("Please upload a valid Excel or CSV file first!")
     else:
+        # 1. Capacity Generation/Loading
         if capacity_mode == "Random Generation":
             np.random.seed(st.session_state.sim_seed)
             dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
@@ -267,6 +218,7 @@ if run_sim_clicked:
                     if (low != 1) or (high != 6):
                         df_dice[m] = [np.random.randint(low, high + 1) for _ in range(num_days)]
 
+        # --- APPLY TIMING FREQUENCY MODIFIERS DYNAMICALLY ---
         applied_configs_desc = []
         for m in members:
             freq = station_frequencies.get(m, 1)
@@ -274,12 +226,13 @@ if run_sim_clicked:
                 for day in df_dice.index:
                     if (day - 1) % freq != 0:
                         df_dice.at[day, m] = 0
-                applied_configs_desc.append(f"{m}({dice_configs[m][0]}-{dice_configs[m][1]}, 1/{freq}d)")
+                applied_configs_desc.append(f"{m}(Range:{dice_configs[m][0]}-{dice_configs[m][1]}, Freq:1/{freq} days)")
             else:
-                applied_configs_desc.append(f"{m}({dice_configs[m][0]}-{dice_configs[m][1]}, Daily)")
+                applied_configs_desc.append(f"{m}(Range:{dice_configs[m][0]}-{dice_configs[m][1]}, Freq:Daily)")
 
         dice_info = " | ".join(applied_configs_desc)
 
+        # 2. Simulation Operations Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
         total_fg = 0
@@ -327,6 +280,7 @@ if run_sim_clicked:
                 "Day Wise Total FG": daily_fg_out
             })
 
+        # Process Extra Performance Tables Matrix Data
         df_pennies = pd.DataFrame(pennies_movement_data)
         df_pennies.index = range(1, num_days + 1)
         df_pennies.index.name = "Day"
@@ -342,7 +296,8 @@ if run_sim_clicked:
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         final_wip_inventory = sum(wip_buffers.values())
 
-        scen_label = "🔥 Base-Run" if is_base_run else f"⚡ Scenario #{history_count}"
+        # Determine structural logging contexts
+        scen_label = "Base-Run" if is_base_run else f"Scenario #{history_count}"
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}={initial_wip[k]}" for k in wip_keys])
         run_description = f"Days={num_days} | Mode={capacity_mode} | WIP: {wip_summary} | Configs: {dice_info}"
 
@@ -350,6 +305,7 @@ if run_sim_clicked:
         avg_total_wip_per_day = sum_total_wip / num_days
         calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
 
+        # Append to historical datastores
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": run_description,
@@ -395,88 +351,85 @@ if run_sim_clicked:
                 "Entropy Spread σH (Monthly)": spread_h_monthly, "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
             })
 
+        # Save all UI layouts to memory
         st.session_state.active_results = {
-            "scen_label": scen_label, "df_dice": df_dice, "df_pennies_final": df_pennies_final,
-            "results_df": results_df, "total_fg": total_fg, "num_days": num_days, "final_wip_inventory": final_wip_inventory
+            "scen_label": scen_label,
+            "df_dice": df_dice,
+            "df_pennies_final": df_pennies_final,
+            "results_df": results_df,
+            "total_fg": total_fg,
+            "num_days": num_days,
+            "final_wip_inventory": final_wip_inventory
         }
         st.rerun()
 
-# --- Layout Management Tabs ---
-tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Diagnostics", "📖 Concept & Logic Laboratory"])
+# --- Application Tabs ---
+tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology"])
 
 with tab1:
-    st.markdown("<h2 style='color: #8A1538; font-family: Georgia, serif;'>🏭 Live Operations & Flow Visualization</h2>", unsafe_allow_html=True)
+    st.title("🚀 Live Operations Console")
     
     if st.session_state.active_results is not None:
         res = st.session_state.active_results
-        
-        st.markdown(f"### Current Execution State: **{res['scen_label']}**")
-        
-        st.markdown("### 🔍 Granular Execution Logs")
-        with st.expander("🎲 Capacity Generation Profile Data Matrix (Dice Outputs)", expanded=False):
-            st.dataframe(res["df_dice"], use_container_width=True)
-            
-        with st.expander("🪙 Step-Wise Log Performance Matrix (Pennies Realized Movement)", expanded=False):
-            st.dataframe(res["df_pennies_final"], use_container_width=True)
-            
-        with st.expander("📦 Queue Log (Buffer Inventory Histories)", expanded=False):
-            st.dataframe(res["results_df"], use_container_width=True)
-            
-        st.markdown("---")
-        
-        col_m1, col_m2, col_m3 = st.columns(3)
-        with col_m1:
-            with st.container(border=True):
-                st.metric("Total System Throughput", f"{int(res['total_fg'])} units")
-        with col_m2:
-            with st.container(border=True):
-                st.metric("Yield Throughput Rate (TR)", f"{round(res['total_fg'] / res['num_days'], 2)} u/day")
-        with col_m3:
-            with st.container(border=True):
-                st.metric("Ending WIP Accumulation", f"{int(res['final_wip_inventory'])} units")
+
+        st.subheader("🎲 Table of Dice Rolls (Capacity Applied)")
+        st.dataframe(res["df_dice"], use_container_width=True)
+
+        st.subheader("🪙 Day-wise Pennies Movement")
+        st.dataframe(res["df_pennies_final"], use_container_width=True)
+
+        st.subheader("📦 Work-In-Progress (WIP) History")
+        st.dataframe(res["results_df"], use_container_width=True)
+
+        st.subheader(f"🏁 {res['scen_label']} Results")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Throughput", int(res["total_fg"])) 
+        c2.metric("Throughput Rate (TR)", round(res["total_fg"] / res["num_days"], 2))
+        c3.metric("Ending WIP Inventory", int(res["final_wip_inventory"])) 
+
+        st.subheader("📈 Performance Trends")
+        st.line_chart(res["results_df"][["Daily_Total_WIP", "Cumulative Throughput"]])
     else:
-        st.info("💡 Adjust your factory configurations in the sidebar and click 'Execute & Save Run' to initialize the production studio.")
+        st.info("💡 Adjust sidebar parameters and click 'Run & Save Simulation' to load dashboard displays.")
 
 with tab2:
-    st.markdown("<h2 style='color: #8A1538; font-family: Georgia, serif;'>📊 Cross-Scenario Strategic Performance Insights</h2>", unsafe_allow_html=True)
-    
+    st.title("📊 Strategic Performance Analytics")
     if user_record["history"]:
         df_table_a = pd.DataFrame(user_record["history"]).set_index("Scenarios")
         s_df = pd.DataFrame(user_record["stations"])
 
-        st.markdown("### 📋 Table A: High-Level Executive Summary")
-        st.dataframe(df_table_a, use_container_width=True)
+        st.subheader("Table A: Summary History")
+        st.table(df_table_a)
         
         st.markdown("---")
-        st.markdown("### 🔬 Table B: Workstation Node Flow Diagnostics")
+        st.subheader("Table B: Station-Level Flow Diagnostics")
         
         metrics_to_show = ["Dice Range", "Throughput", "Avg WIP", "Entropy Hi (Monthly Avg)", "Entropy Spread σH (Monthly)", "Interpretation"]
         rows_b = []
         for scen in s_df['Scenario'].unique():
             for i, metric in enumerate(metrics_to_show):
-                row_data = {"Scenario": scen if i == 0 else "", "Diagnostic Metric": metric}
+                row_data = {"Scenario": scen if i == 0 else "", "Metric": metric}
                 for s_label in s_df['Station'].unique():
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == s_label)]
                     row_data[s_label] = subset[metric].values[0] if not subset.empty and metric in subset.columns else "N/A"
                 rows_b.append(row_data)
         
         if rows_b:
-            df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Diagnostic Metric"])
-            st.dataframe(df_table_b, use_container_width=True)
+            df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
+            st.table(df_table_b)
             
         st.markdown("---")
-        st.markdown("### ⏱️ Table C: Segmented Temporal Buffer Queue Averages")
+        st.subheader("Table C: Temporal WIP Averages (By Buffer)")
         all_recorded_stations = s_df['Station'].unique()
         recorded_letters = sorted([s.split(" ")[1] for s in all_recorded_stations])
-        buffer_labels = [f"Buffer {recorded_letters[i]}{recorded_letters[i+1]}" for i in range(len(recorded_letters) - 1)]
+        buffer_labels = [f"{recorded_letters[i]}{recorded_letters[i+1]}" for i in range(len(recorded_letters) - 1)]
 
         rows_c = []
         for scen in s_df['Scenario'].unique():
             for period in ["Day-wise Avg WIP", "Week-wise Avg WIP", "Month-wise Avg WIP"]:
-                row_data = {"Scenario": scen, "Evaluation Interval": period}
+                row_data = {"Scenario": scen, "Time Metric": period}
                 for b_label in buffer_labels:
-                    station_letter = b_label.split(" ")[1][1]
-                    target_station = f"Station {station_letter}" 
+                    target_station = f"Station {b_label[1]}" 
                     subset = s_df[(s_df['Scenario'] == scen) & (s_df['Station'] == target_station)]
                     if not subset.empty:
                         total_wip_accumulated = subset["Avg WIP"].values[0] * num_days
@@ -489,51 +442,69 @@ with tab2:
                 rows_c.append(row_data)
 
         if rows_c:
-            df_table_c = pd.DataFrame(rows_c).set_index(["Scenario", "Evaluation Interval"])
-            st.dataframe(df_table_c, use_container_width=True)
+            df_table_c = pd.DataFrame(rows_c).set_index(["Scenario", "Time Metric"])
+            st.table(df_table_c)
             
         st.markdown("---")
-        st.markdown("### 📥 Export Laboratory Package Data")
+        st.subheader("📥 Export Analytics")
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_table_a.to_excel(writer, sheet_name='Summary History')
             df_table_b.reset_index().to_excel(writer, sheet_name='Station Diagnostics', index=False)
             df_table_c.reset_index().to_excel(writer, sheet_name='Temporal WIP', index=False)
         excel_data = output.getvalue()
-        st.download_button(
-            label="📥 Download Full Lab Results (.XLSX)", 
-            data=excel_data, 
-            file_name=f"Factory_Simulation_{current_user}.xlsx",
-            type="secondary",
-            use_container_width=True
-        )
+        st.download_button(label="Download Full Analytics Excel", data=excel_data, file_name=f"Full_Simulation_{current_user}.xlsx")
     else:
-        st.info("No run logs found. Please run a simulation on the Operations Console first.")
+        st.info("No recorded history found for this User ID.")
 
+# --- PAGE 3: METHODOLOGY ---
 with tab3:
-    st.markdown("<h2 style='color: #8A1538; font-family: Georgia, serif;'>📖 Foundational Engineering Methodology</h2>", unsafe_allow_html=True)
+    st.title("📖 Simulation Methodology & Logic")
     st.markdown("""
-    This simulator models the classic **Theory of Constraints (TOC)** production engine game. It demonstrates how system variance and balanced dependencies create massive bottlenecks.
+    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
     """)
-    
-    with st.container(border=True):
-        st.markdown("### ⚙️ The Mathematical Governing Flow Rule")
-        st.markdown("Because a downline station is dependent on raw material provided by an upline partner station, real throughput is restricted by the absolute limit of available inventory:")
-        st.latex(r"\text{Actual Realized Movement}_{i} = \min\left(\text{Dice Roll Capability}_{i},\, \text{Inventory Level In Buffer}_{i-1 \to i}\right)")
-        st.info("💡 **Takeaway:** Even if you roll a 20, if your preceding buffer only holds 2 units, your station output is limited to 2!")
 
-    col_l2, col_r2 = st.columns(2)
-    with col_l2:
-        with st.container(border=True):
-            st.markdown("#### Throughput Rate ($TR$) Formula")
-            st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily Finished Goods Out}}{n}")
-            
-            st.markdown("#### Shannon Node Entropy ($H$) Formula")
-            st.latex(r"H = -\sum P(x) \log_2 P(x)")
-    with col_r2:
-        with st.container(border=True):
-            st.markdown("#### Little's Law Operational Lead Time ($L$)")
-            st.latex(r"L = \frac{\text{Average Accumulation Daily WIP}}{TR}")
-            
-            st.markdown("#### Entropy Spread System Metric ($\sigma H$)")
-            st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
+    st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
+    st.markdown("### System Architecture")
+    st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
+    st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
+
+    st.info("""
+    **The Student's Guide to Movement Logic:**
+    The actual work done is the **minimum** of your ability (Dice) and your availability (Buffer).
+    """)
+
+    st.latex(r"\text{Movement}_{B} = \min(\text{Dice Roll}_{B}, \text{Buffer}_{A \to B})")
+
+    st.markdown("---")
+
+    st.header("📊 Table A: Summary History")
+    col1, col2 = st.columns(2)
+    with col1:
+
+        st.write("### Throughput Rate ($TR$)")
+        st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily Throughput}}{n}")
+
+        st.write("### Average System Entropy ($\bar{H}$)")
+        st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
+
+    with col2:
+        st.write("### Lead Time ($L$)")
+        st.markdown("Calculated based on average daily WIP levels relative to throughput rate.")
+        st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
+
+        st.write("### Entropy Spread ($\sigma H$)")
+        st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
+
+    st.markdown("---")
+
+    st.header("🔬 Table B: Station-Level Flow Diagnostics")
+    st.latex(r"H = -\sum P(x) \log_2 P(x)")
+
+    st.markdown("""
+    **How to read Table B:**
+    * **Avg WIP:** High WIP indicates this station is a **Bottleneck**.
+    * **Entropy ($H_i$):**
+        * **Stable (< 2.4):** Predictable output.
+        * **Variable (≥ 2.4):** High 'jitter' or chaos.
+    """)
