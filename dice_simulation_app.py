@@ -95,7 +95,7 @@ st.sidebar.markdown("---")
 st.sidebar.header("⚙️ Capacity Input Mode")
 capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
 
-# Initialize variables
+# Initialize dynamic operational variables
 uploaded_df = None
 num_days = 1500
 num_members = 7
@@ -114,24 +114,24 @@ if capacity_mode == "Random Generation":
 
     st.sidebar.caption(f"Active Deterministic Seed: `{st.session_state.sim_seed}`")
     
-    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=9)
-    members_list = [chr(64 + i) for i in range(1, num_members + 1)] 
+    members_list = [chr(64 + i) for i in range(1, 10)]
     
     # "Release the Choke" Configuration for Scenario Runs
     if not is_base_run:
         st.sidebar.subheader("🚨 Intervention Control Room")
         activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
         if activate_choke_release:
-            choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A'])
+            choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 9])
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
-    for m in members_list:
+    for m in members_list[:9]: # Default to 7 workstations
         if m == 'A' and activate_choke_release and choke_target_station:
             st.sidebar.caption("Station A Range: *Mirrored from Target*")
             continue
         dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=3000)
+    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=9)
 
 else:
     uploaded_file = st.sidebar.file_uploader("Upload operational 'Table of Dice Rolls' data source", type=["xlsx", "xls", "csv"])
@@ -151,48 +151,53 @@ else:
             st.sidebar.error(f"Error parsing file: {e}. Ensure day counts are structural records.")
             
     if uploaded_df is not None:
-        members_list = [chr(64 + i) for i in range(1, num_members + 1)]
+        temp_members = [chr(64 + i) for i in range(1, num_members + 1)]
         
         if is_base_run:
             st.sidebar.warning("🔒 Baseline Protection Active: Scenario parameters are locked.")
-            for m in members_list:
+            for m in temp_members:
                 dice_configs[m] = (1, 6)
         else:
             st.sidebar.markdown("---")
             st.sidebar.header("🚀 Scenario Interventions")
+            st.sidebar.info(f"Configuring Interactive Scenario Expansion #{history_count}. Adjust parameters below:")
+            
             activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
             if activate_choke_release:
-                choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A'])
+                choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in temp_members if m != 'A'])
             
-            for m in members_list:
+            for m in temp_members:
                 if m == 'A' and activate_choke_release:
                     st.sidebar.caption("Station A Range: *Mirrored from Target File Column*")
                     continue
                 dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
-    else:
-        members_list = [chr(64 + i) for i in range(1, 8)]
 
 # Generate target structures dynamically
-wip_keys = [f"WIP_{members_list[i]}{members_list[i+1]}" for i in range(len(members_list) - 1)]
+members = [chr(64 + i) for i in range(1, num_members + 1)]
+wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
 # SECTION 2: WIP INITIALIZATION
 st.sidebar.markdown("---")
 st.sidebar.header("📦 Line-Stock WIP Initialization")
 initial_wip = {k: st.sidebar.number_input(f"Initial Buffer {k.replace('WIP_', '')}", min_value=0, value=4) for k in wip_keys}
 
-# SECTION 3: SIMULATION EXECUTION
+# SECTION 3: SIMULATION EXECUTION (MAIN BUTTON PLACE)
 st.sidebar.markdown("---")
 st.sidebar.header("🚀 Execution Terminal")
 run_sim_clicked = st.sidebar.button("▶ Compile & Execute Trial", use_container_width=True, type="primary")
 
-# ... [Remaining sections for Maintenance/Account stay the same]
+# SECTION 4: DATA MAINTENANCE
 st.sidebar.markdown("---")
 st.sidebar.header("🧹 Workspace Maintenance")
 clear_history_clicked = st.sidebar.button("🗑️ Purge Historical Logs", use_container_width=True)
+
+# SECTION 5: ACCOUNT PORTAL
 st.sidebar.markdown("---")
 st.sidebar.header("🚪 Session Management")
 logout_clicked = st.sidebar.button("🚪 Terminate Session & Exit", use_container_width=True)
 
+
+# --- Handle Clear and Logout Button Operations ---
 if clear_history_clicked:
     user_record["history"] = []
     user_record["stations"] = []
@@ -204,35 +209,49 @@ if logout_clicked:
     st.session_state.active_results = None
     st.rerun()
 
+
+# --- Utility Functions ---
 def calculate_entropy(values):
     if len(values) == 0: return 0
     unique, counts = np.unique(values, return_counts=True)
     p = counts / counts.sum()
     return -np.sum(p * np.log2(p))
 
+
+# --- Simulation Processing Engine ---
 if run_sim_clicked:
     if "Import" in capacity_mode and uploaded_df is None:
         st.sidebar.error("Execution Fault: Please upload an analytical capacity CSV/Excel matrix first!")
     else:
+        # Sync configurations if Choke release is chosen
         if activate_choke_release and choke_target_station:
             dice_configs['A'] = dice_configs[choke_target_station]
 
+        # 1. Capacity Generation/Loading
         if capacity_mode == "Random Generation":
             np.random.seed(st.session_state.sim_seed)
             dice_rolls = {}
-            for m in members_list:
-                if m == 'A' and activate_choke_release and choke_target_station: continue
+            
+            # Populate ranges for all stations first
+            for m in members:
+                if m == 'A' and activate_choke_release and choke_target_station:
+                    continue # Will copy after loop
                 dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
             
+            # Apply dynamic Choke Release mirroring if active
             if activate_choke_release and choke_target_station:
                 dice_rolls['A'] = list(dice_rolls[choke_target_station])
                 
-            df_dice = pd.DataFrame(dice_rolls).reindex(columns=members_list)
+            df_dice = pd.DataFrame(dice_rolls)
+            
+            # CRITICAL FIX: Force alignment back to standard structural ordering
+            df_dice = df_dice.reindex(columns=members)
+            
             df_dice.index = range(1, num_days + 1)
             df_dice.index.name = "Day"
         else:
             df_dice = uploaded_df.copy()
-            df_dice.columns = members_list
+            df_dice.columns = members
             df_dice.index.name = "Day"
             
             if not is_base_run and dice_configs:
