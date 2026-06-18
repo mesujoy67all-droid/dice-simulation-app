@@ -106,6 +106,9 @@ activate_choke_release = False
 if capacity_mode == "Random Generation":
     if 'sim_seed' not in st.session_state:
         st.session_state.sim_seed = None
+        
+    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=9)
+    members = [chr(64 + i) for i in range(1, num_members + 1)]
 
     keep_seed = st.sidebar.toggle("🔒 Lock Environmental Seed", value=False)
 
@@ -121,10 +124,10 @@ if capacity_mode == "Random Generation":
         st.sidebar.subheader("🚨 Intervention Control Room")
         activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
         if activate_choke_release:
-            choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
+            choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members if m != 'A'])
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
-
-    for m in members: 
+            
+    for m in members:  # Now 'members' is defined!
         if m == 'A' and activate_choke_release and choke_target_station:
             st.sidebar.caption("Station A Range: *Mirrored from Target*")
             continue
