@@ -114,24 +114,24 @@ if capacity_mode == "Random Generation":
 
     st.sidebar.caption(f"Active Deterministic Seed: `{st.session_state.sim_seed}`")
     
-    members_list = [chr(64 + i) for i in range(1, 9)] 
+    members_list = [chr(64 + i) for i in range(1, 10)] 
     
     # "Release the Choke" Configuration for Scenario Runs
     if not is_base_run:
         st.sidebar.subheader("🚨 Intervention Control Room")
         activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
         if activate_choke_release:
-            choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A' and ord(m)-64 <= 7])
+            choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in members_list if m != 'A')
             st.sidebar.info(f"Station A will dynamically mirror Station {choke_target_station}'s constraints.")
 
-    for m in members_list[:7]: # Default to 7 workstations
+    for m in members_list[:num_members]: # Default to 7 workstations
         if m == 'A' and activate_choke_release and choke_target_station:
             st.sidebar.caption("Station A Range: *Mirrored from Target*")
             continue
         dice_configs[m] = st.sidebar.slider(f"Dice Range for Workstation {m}", 1, 20, (1, 6))
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=3000)
-    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=7)
+    num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=9)
 
 else:
     uploaded_file = st.sidebar.file_uploader("Upload operational 'Table of Dice Rolls' data source", type=["xlsx", "xls", "csv"])
