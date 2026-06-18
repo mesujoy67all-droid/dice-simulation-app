@@ -165,7 +165,8 @@ else:
             activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
             if activate_choke_release:
                 choke_target_station = st.sidebar.selectbox("Align Station A production capacity to:", [m for m in temp_members if m != 'A'])
-            
+                
+            members = [chr(64 + i) for i in range(1, num_members + 1)]  
             for m in temp_members:
                 if m == 'A' and activate_choke_release:
                     st.sidebar.caption("Station A Range: *Mirrored from Target File Column*")
