@@ -135,7 +135,6 @@ if capacity_mode == "Random Generation":
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=3000)
     num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=9, max_value=9, key="num_members")
-Also find this line near the top and update 
 
 else:
     uploaded_file = st.sidebar.file_uploader("Upload operational 'Table of Dice Rolls' data source", type=["xlsx", "xls", "csv"])
