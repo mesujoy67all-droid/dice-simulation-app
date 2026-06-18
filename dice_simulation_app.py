@@ -13,287 +13,283 @@ st.set_page_config(
 
 # --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
-    <style>
+ <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
+ 
     /* Global Font */
     html, body, [class*="css"], .stMarkdown, .stText, p, div {
         font-family: 'Inter', sans-serif;
+        font-size: 1rem;
     }
-
+ 
     /* Page background */
-    .main { background-color: #F0F4FF; }
+    .main { background-color: #F8FAFF; }
     .main .block-container {
         padding-top: 2rem;
         padding-bottom: 3rem;
     }
-
-    /* Sidebar styling */
+ 
+    /* Sidebar styling - lighter blue gradient */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0F172A 0%, #1E3A8A 100%);
+        background: linear-gradient(180deg, #1E3A8A 0%, #3B82F6 100%);
     }
     section[data-testid="stSidebar"] * {
-        color: #E2E8F0 !important;
+        color: #EFF6FF !important;
     }
     section[data-testid="stSidebar"] .stRadio label,
     section[data-testid="stSidebar"] .stSlider label,
     section[data-testid="stSidebar"] .stNumberInput label,
     section[data-testid="stSidebar"] .stToggle label {
-        color: #CBD5E1 !important;
-        font-size: 0.85rem !important;
+        color: #DBEAFE !important;
+        font-size: 1rem !important;
         font-weight: 500 !important;
         letter-spacing: 0.3px;
     }
     section[data-testid="stSidebar"] h1,
     section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3 {
-        color: #F8FAFC !important;
-        font-size: 0.95rem !important;
+        color: #FFFFFF !important;
+        font-size: 1rem !important;
         font-weight: 700 !important;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
-
-    /* Metric cards */
+ 
+    /* Metric cards - lighter blue gradient */
     div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
+        background: linear-gradient(135deg, #2563EB 0%, #60A5FA 100%);
         border-radius: 14px;
-        padding: 1.2rem 1.5rem;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
-        border: 1px solid rgba(255,255,255,0.1);
+        padding: 1.4rem 1.6rem;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.25);
+        border: 1px solid rgba(255,255,255,0.2);
+        min-width: 0 !important;
+        width: 100% !important;
     }
     div[data-testid="stMetricValue"] {
-        font-size: 2.4rem !important;
+        font-size: 2.8rem !important;
         font-weight: 800 !important;
         color: #FFFFFF !important;
         letter-spacing: -0.5px;
     }
     div[data-testid="stMetricLabel"] {
-        font-size: 0.78rem !important;
+        font-size: 0.88rem !important;
         font-weight: 600 !important;
-        color: #BFDBFE !important;
+        color: #DBEAFE !important;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
-
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #E8EEFF;
-        border-radius: 12px;
-        padding: 4px;
-        gap: 4px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        font-size: 0.95rem !important;
-        font-weight: 600 !important;
-        padding: 10px 24px !important;
-        border-radius: 8px !important;
-        color: #475569 !important;
-        background-color: transparent !important;
-        border: none !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #1E3A8A !important;
-        color: #FFFFFF !important;
-        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.4) !important;
-    }
-
-    /* Auth card */
-    .auth-card {
-        background: linear-gradient(145deg, #FFFFFF, #F0F6FF);
-        border: 1px solid #BFDBFE;
-        padding: 2.5rem;
-        border-radius: 16px;
-        box-shadow: 0 8px 30px rgba(30, 58, 138, 0.12);
-    }
-
-    /* Section headers in main area */
-    h1 { 
-        font-size: 2rem !important; 
-        font-weight: 800 !important; 
-        color: #0F172A !important;
-        letter-spacing: -0.5px;
-    }
-    h2 { 
-        font-size: 1.5rem !important; 
-        font-weight: 700 !important; 
-        color: #1E3A8A !important;
-    }
-    h3 { 
-        font-size: 1.15rem !important; 
-        font-weight: 600 !important; 
-        color: #1E40AF !important;
-    }
-
-    /* Dataframe */
-    .stDataFrame {
-        border-radius: 10px !important;
-        overflow: hidden;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-        border: 1px solid #DBEAFE !important;
-    }
-
-    /* Buttons */
-    .stButton > button {
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 0.9rem !important;
-        border-radius: 8px !important;
-        letter-spacing: 0.3px;
-        transition: all 0.2s ease;
-    }
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #1E3A8A, #2563EB) !important;
-        border: none !important;
-        box-shadow: 0 3px 10px rgba(37, 99, 235, 0.4) !important;
-    }
-    .stButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 5px 15px rgba(37, 99, 235, 0.5) !important;
-    }
-
-    /* Info / success / warning boxes */
-    .stAlert {
-        border-radius: 10px !important;
-        font-size: 0.9rem !important;
-        font-weight: 500 !important;
-    }
-
-    /* Download button */
-    .stDownloadButton > button {
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 0.88rem !important;
-        border-radius: 8px !important;
-        background: linear-gradient(135deg, #059669, #10B981) !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35) !important;
-    }
-
-    /* Table styling */
-    table {
-        font-size: 0.85rem !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-    thead tr th {
-        background-color: #1E3A8A !important;
-        color: white !important;
-        font-weight: 700 !important;
-        letter-spacing: 0.5px;
-        font-size: 0.8rem !important;
-    }
-    tbody tr:nth-child(even) { background-color: #EFF6FF !important; }
-    tbody tr:hover { background-color: #DBEAFE !important; }
-
-    /* Caption text */
-    .stCaption, caption {
-        font-size: 0.78rem !important;
-        color: #94A3B8 !important;
-    }
-      /* Fix metric columns - equal width, proper sizing */
-    div[data-testid="stMetric"] {
-        min-width: 0 !important;
-        width: 100% !important;
-    }
-    div[data-testid="column"] {
-        padding: 0 0.4rem !important;
-    }
-
-    /* Fix main content background */
-    .main > div {
-        background-color: #F0F4FF !important;
-    }
-    section.main {
-        background-color: #F0F4FF !important;
-    }
-
-    /* Fix sidebar label font size and spacing */
-    section[data-testid="stSidebar"] .stSlider label p,
-    section[data-testid="stSidebar"] .stNumberInput label p,
-    section[data-testid="stSidebar"] .stRadio label p,
-    section[data-testid="stSidebar"] .stCheckbox label p {
-        font-size: 0.82rem !important;
-        color: #CBD5E1 !important;
-        line-height: 1.4 !important;
-        margin-bottom: 2px !important;
-    }
-
-    /* Sidebar slider track color */
-    section[data-testid="stSidebar"] .stSlider [data-testid="stThumbValue"] {
-        color: #93C5FD !important;
-        font-size: 0.78rem !important;
-        font-weight: 600 !important;
-    }
-
-    /* Fix subheader spacing in sidebar */
-    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-        font-size: 0.82rem !important;
-        color: #94A3B8 !important;
-        line-height: 1.5 !important;
-    }
-
-    /* Active session banner */
-    section[data-testid="stSidebar"] div[style*="background-color:#1E3A8A"] {
-        background: linear-gradient(135deg, #1D4ED8, #7C3AED) !important;
-        font-size: 0.88rem !important;
-        letter-spacing: 1.5px !important;
-    }
-
-    /* Subheader text in main */
-    .stSubheader, [data-testid="stSubheader"] {
-        font-size: 1.05rem !important;
-        font-weight: 700 !important;
-        color: #1E3A8A !important;
-        border-left: 4px solid #2563EB;
-        padding-left: 10px !important;
-        margin-top: 1.5rem !important;
-    }
-    /* Fix metric label visibility */
     div[data-testid="stMetric"] label,
     div[data-testid="stMetricLabel"] p {
-        color: #BFDBFE !important;
-        font-size: 0.75rem !important;
+        color: #DBEAFE !important;
+        font-size: 0.88rem !important;
         font-weight: 600 !important;
         text-transform: uppercase !important;
         letter-spacing: 1.2px !important;
         opacity: 1 !important;
     }
-
-    /* Fix number inputs in sidebar */
-    section[data-testid="stSidebar"] input[type="number"] {
-        background-color: #1E3A8A !important;
-        color: #F1F5F9 !important;
-        border: 1px solid #3B82F6 !important;
-        border-radius: 6px !important;
+    div[data-testid="column"] {
+        padding: 0 0.4rem !important;
+    }
+ 
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #DBEAFE;
+        border-radius: 12px;
+        padding: 4px;
+        gap: 4px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        padding: 10px 24px !important;
+        border-radius: 8px !important;
+        color: #1E40AF !important;
+        background-color: transparent !important;
+        border: none !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #3B82F6 !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4) !important;
+    }
+ 
+    /* Auth card */
+    .auth-card {
+        background: linear-gradient(145deg, #FFFFFF, #EFF6FF);
+        border: 1px solid #BFDBFE;
+        padding: 2.5rem;
+        border-radius: 16px;
+        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.1);
+    }
+ 
+    /* Section headers in main area */
+    h1 { 
+        font-size: 2rem !important; 
+        font-weight: 800 !important; 
+        color: #1E3A8A !important;
+        letter-spacing: -0.5px;
+    }
+    h2 { 
+        font-size: 1.5rem !important; 
+        font-weight: 700 !important; 
+        color: #2563EB !important;
+    }
+    h3 { 
+        font-size: 1.2rem !important; 
+        font-weight: 600 !important; 
+        color: #3B82F6 !important;
+    }
+ 
+    /* Dataframe */
+    .stDataFrame {
+        border-radius: 10px !important;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        border: 1px solid #BFDBFE !important;
+    }
+ 
+    /* Buttons */
+    .stButton > button {
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        border-radius: 8px !important;
+        letter-spacing: 0.3px;
+        transition: all 0.2s ease;
+    }
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #2563EB, #60A5FA) !important;
+        border: none !important;
+        box-shadow: 0 3px 10px rgba(37, 99, 235, 0.35) !important;
+    }
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 5px 15px rgba(37, 99, 235, 0.45) !important;
+    }
+ 
+    /* Info / success / warning boxes */
+    .stAlert {
+        border-radius: 10px !important;
+        font-size: 1rem !important;
+        font-weight: 500 !important;
+    }
+ 
+    /* Download button */
+    .stDownloadButton > button {
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        border-radius: 8px !important;
+        background: linear-gradient(135deg, #059669, #34D399) !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3) !important;
+    }
+ 
+    /* Table styling */
+    table {
+        font-size: 1rem !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    thead tr th {
+        background-color: #3B82F6 !important;
+        color: white !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.5px;
+        font-size: 0.95rem !important;
+        padding: 10px 14px !important;
+    }
+    tbody tr td {
+        font-size: 0.95rem !important;
+        padding: 8px 14px !important;
+    }
+    tbody tr:nth-child(even) { background-color: #EFF6FF !important; }
+    tbody tr:hover { background-color: #DBEAFE !important; }
+ 
+    /* Caption text */
+    .stCaption, caption {
         font-size: 0.88rem !important;
+        color: #64748B !important;
+    }
+ 
+    /* Fix main content background */
+    .main > div {
+        background-color: #F8FAFF !important;
+    }
+    section.main {
+        background-color: #F8FAFF !important;
+    }
+    [data-testid="stAppViewContainer"] {
+        background-color: #F8FAFF !important;
+    }
+    [data-testid="stAppViewContainer"] > section.main {
+        background-color: #F8FAFF !important;
+    }
+ 
+    /* Fix sidebar label font size and spacing */
+    section[data-testid="stSidebar"] .stSlider label p,
+    section[data-testid="stSidebar"] .stNumberInput label p,
+    section[data-testid="stSidebar"] .stRadio label p,
+    section[data-testid="stSidebar"] .stCheckbox label p {
+        font-size: 0.95rem !important;
+        color: #DBEAFE !important;
+        line-height: 1.5 !important;
+        margin-bottom: 2px !important;
+    }
+ 
+    /* Sidebar slider thumb value */
+    section[data-testid="stSidebar"] .stSlider [data-testid="stThumbValue"] {
+        color: #BFDBFE !important;
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+    }
+ 
+    /* Fix markdown text in sidebar */
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        font-size: 0.92rem !important;
+        color: #BFDBFE !important;
+        line-height: 1.5 !important;
+    }
+ 
+    /* Active session banner */
+    section[data-testid="stSidebar"] div[style*="background-color:#1E3A8A"] {
+        background: linear-gradient(135deg, #3B82F6, #818CF8) !important;
+        font-size: 0.95rem !important;
+        letter-spacing: 1.5px !important;
+    }
+ 
+    /* Subheader text in main */
+    .stSubheader, [data-testid="stSubheader"] {
+        font-size: 1.1rem !important;
+        font-weight: 700 !important;
+        color: #2563EB !important;
+        border-left: 4px solid #60A5FA;
+        padding-left: 10px !important;
+        margin-top: 1.5rem !important;
+    }
+ 
+    /* Number inputs in sidebar */
+    section[data-testid="stSidebar"] input[type="number"] {
+        background-color: rgba(255,255,255,0.15) !important;
+        color: #FFFFFF !important;
+        border: 1px solid rgba(255,255,255,0.4) !important;
+        border-radius: 6px !important;
+        font-size: 1rem !important;
         font-weight: 600 !important;
     }
     section[data-testid="stSidebar"] input[type="number"]:focus {
-        border: 1px solid #60A5FA !important;
-        box-shadow: 0 0 0 2px rgba(96,165,250,0.3) !important;
+        border: 1px solid #BFDBFE !important;
+        box-shadow: 0 0 0 2px rgba(191,219,254,0.3) !important;
     }
-
-    /* Fix main background */
-    [data-testid="stAppViewContainer"] {
-        background-color: #EFF6FF !important;
-    }
-    [data-testid="stAppViewContainer"] > section.main {
-        background-color: #EFF6FF !important;
-    }
-
-    /* Fix +/- buttons in sidebar number inputs */
     section[data-testid="stSidebar"] button[kind="secondary"] {
-        background-color: #2563EB !important;
+        background-color: rgba(255,255,255,0.2) !important;
         color: white !important;
         border: none !important;
         border-radius: 4px !important;
     }
-
-    /* Number input labels in sidebar */
     section[data-testid="stSidebar"] .stNumberInput label p {
-        color: #93C5FD !important;
-        font-size: 0.83rem !important;
+        color: #DBEAFE !important;
+        font-size: 0.95rem !important;
         font-weight: 600 !important;
         margin-bottom: 4px !important;
     }
