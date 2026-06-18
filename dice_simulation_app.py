@@ -14,308 +14,244 @@ st.set_page_config(
 # --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
  <style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-    /* ── GLOBAL ── */
-    html, body, [class*="css"], p, div {
-        font-family: 'Inter', sans-serif !important;
-        -webkit-font-smoothing: antialiased;
+    /* Global Font */
+    html, body, [class*="css"], .stMarkdown, .stText, p, div {
+        font-family: 'Inter', sans-serif;
     }
 
-    /* ── PAGE BACKGROUND ── */
-    [data-testid="stAppViewContainer"],
-    .main, .main > div, section.main {
-        background-color: #F8FAFC !important;
-    }
+    /* Page background */
+    .main { background-color: #F0F4FF; }
     .main .block-container {
-        padding-top: 2rem !important;
-        padding-bottom: 4rem !important;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
     }
 
-    /* ── SIDEBAR ── */
+    /* Sidebar styling */
     section[data-testid="stSidebar"] {
-        background: #0F172A !important;
-        border-right: 1px solid #1E293B !important;
+        background: linear-gradient(180deg, #0F172A 0%, #1E3A8A 100%);
     }
     section[data-testid="stSidebar"] * {
+        color: #E2E8F0 !important;
+    }
+    section[data-testid="stSidebar"] .stRadio label,
+    section[data-testid="stSidebar"] .stSlider label,
+    section[data-testid="stSidebar"] .stNumberInput label,
+    section[data-testid="stSidebar"] .stToggle label {
         color: #CBD5E1 !important;
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+        letter-spacing: 0.3px;
     }
     section[data-testid="stSidebar"] h1,
     section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3 {
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 0.68rem !important;
+        color: #F8FAFC !important;
+        font-size: 0.95rem !important;
         font-weight: 700 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 2px !important;
-        color: #64748B !important;
-        margin-bottom: 0.5rem !important;
-    }
-    section[data-testid="stSidebar"] label p,
-    section[data-testid="stSidebar"] .stSlider label p,
-    section[data-testid="stSidebar"] .stNumberInput label p,
-    section[data-testid="stSidebar"] .stRadio label p,
-    section[data-testid="stSidebar"] .stCheckbox label p,
-    section[data-testid="stSidebar"] .stToggle label p {
-        font-size: 0.88rem !important;
-        font-weight: 500 !important;
-        color: #CBD5E1 !important;
-        line-height: 1.5 !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-        font-size: 0.8rem !important;
-        color: #64748B !important;
-        line-height: 1.6 !important;
-    }
-    section[data-testid="stSidebar"] input[type="number"] {
-        background: #1E293B !important;
-        color: #F1F5F9 !important;
-        border: 1px solid #334155 !important;
-        border-radius: 6px !important;
-        font-family: 'JetBrains Mono', monospace !important;
-        font-size: 0.92rem !important;
-        font-weight: 500 !important;
-    }
-    section[data-testid="stSidebar"] input[type="number"]:focus {
-        border-color: #3B82F6 !important;
-        box-shadow: 0 0 0 3px rgba(59,130,246,0.2) !important;
-    }
-    section[data-testid="stSidebar"] button[kind="secondary"] {
-        background: #1E293B !important;
-        color: #CBD5E1 !important;
-        border: 1px solid #334155 !important;
-        border-radius: 6px !important;
-    }
-    section[data-testid="stSidebar"] .stCaption p {
-        font-family: 'JetBrains Mono', monospace !important;
-        font-size: 0.72rem !important;
-        color: #475569 !important;
-    }
-    section[data-testid="stSidebar"] div[style*="background-color:#1E3A8A"] {
-        background: linear-gradient(90deg, #1D4ED8, #2563EB) !important;
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 0.75rem !important;
-        font-weight: 700 !important;
-        letter-spacing: 2px !important;
-        border-radius: 6px !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
 
-    /* ── TABS ── */
+    /* Metric cards */
+    div[data-testid="stMetric"] {
+        background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
+        border-radius: 14px;
+        padding: 1.2rem 1.5rem;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 2.4rem !important;
+        font-weight: 800 !important;
+        color: #FFFFFF !important;
+        letter-spacing: -0.5px;
+    }
+    div[data-testid="stMetricLabel"] {
+        font-size: 0.78rem !important;
+        font-weight: 600 !important;
+        color: #BFDBFE !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Tab styling */
     .stTabs [data-baseweb="tab-list"] {
-        background: #FFFFFF !important;
-        border-radius: 10px !important;
-        padding: 5px !important;
-        gap: 3px !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
-        border: 1px solid #E2E8F0 !important;
+        background-color: #E8EEFF;
+        border-radius: 12px;
+        padding: 4px;
+        gap: 4px;
     }
     .stTabs [data-baseweb="tab"] {
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 0.92rem !important;
+        font-size: 0.95rem !important;
         font-weight: 600 !important;
-        padding: 9px 22px !important;
+        padding: 10px 24px !important;
         border-radius: 8px !important;
         color: #475569 !important;
-        background: transparent !important;
+        background-color: transparent !important;
         border: none !important;
     }
-    .stTabs [data-baseweb="tab"]:hover {
-        color: #2563EB !important;
-        background: #EFF6FF !important;
-    }
     .stTabs [aria-selected="true"] {
-        background: #0F172A !important;
+        background-color: #1E3A8A !important;
         color: #FFFFFF !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.4) !important;
     }
 
-    /* ── METRIC CARDS ── */
+    /* Auth card */
+    .auth-card {
+        background: linear-gradient(145deg, #FFFFFF, #F0F6FF);
+        border: 1px solid #BFDBFE;
+        padding: 2.5rem;
+        border-radius: 16px;
+        box-shadow: 0 8px 30px rgba(30, 58, 138, 0.12);
+    }
+
+    /* Section headers in main area */
+    h1 { 
+        font-size: 2rem !important; 
+        font-weight: 800 !important; 
+        color: #0F172A !important;
+        letter-spacing: -0.5px;
+    }
+    h2 { 
+        font-size: 1.5rem !important; 
+        font-weight: 700 !important; 
+        color: #1E3A8A !important;
+    }
+    h3 { 
+        font-size: 1.15rem !important; 
+        font-weight: 600 !important; 
+        color: #1E40AF !important;
+    }
+
+    /* Dataframe */
+    .stDataFrame {
+        border-radius: 10px !important;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+        border: 1px solid #DBEAFE !important;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        border-radius: 8px !important;
+        letter-spacing: 0.3px;
+        transition: all 0.2s ease;
+    }
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #1E3A8A, #2563EB) !important;
+        border: none !important;
+        box-shadow: 0 3px 10px rgba(37, 99, 235, 0.4) !important;
+    }
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 5px 15px rgba(37, 99, 235, 0.5) !important;
+    }
+
+    /* Info / success / warning boxes */
+    .stAlert {
+        border-radius: 10px !important;
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+    }
+
+    /* Download button */
+    .stDownloadButton > button {
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
+        border-radius: 8px !important;
+        background: linear-gradient(135deg, #059669, #10B981) !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35) !important;
+    }
+
+    /* Table styling */
+    table {
+        font-size: 0.85rem !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    thead tr th {
+        background-color: #1E3A8A !important;
+        color: white !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.5px;
+        font-size: 0.8rem !important;
+    }
+    tbody tr:nth-child(even) { background-color: #EFF6FF !important; }
+    tbody tr:hover { background-color: #DBEAFE !important; }
+
+    /* Caption text */
+    .stCaption, caption {
+        font-size: 0.78rem !important;
+        color: #94A3B8 !important;
+    }
+      /* Fix metric columns - equal width, proper sizing */
     div[data-testid="stMetric"] {
-        background: #FFFFFF !important;
-        border-radius: 12px !important;
-        padding: 1.5rem 1.75rem !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05) !important;
-        border: 1px solid #E2E8F0 !important;
-        border-top: 3px solid #3B82F6 !important;
         min-width: 0 !important;
         width: 100% !important;
     }
-    div[data-testid="stMetricLabel"] p,
-    div[data-testid="stMetric"] label {
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 0.7rem !important;
-        font-weight: 700 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 1.5px !important;
-        color: #94A3B8 !important;
-        opacity: 1 !important;
-        margin-bottom: 6px !important;
-    }
-    div[data-testid="stMetricValue"] {
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 2.6rem !important;
-        font-weight: 700 !important;
-        color: #0F172A !important;
-        letter-spacing: -1px !important;
-        line-height: 1.1 !important;
-    }
     div[data-testid="column"] {
-        padding: 0 0.5rem !important;
+        padding: 0 0.4rem !important;
     }
 
-    /* ── HEADINGS ── */
-    h1 {
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 1.9rem !important;
-        font-weight: 700 !important;
-        color: #0F172A !important;
-        letter-spacing: -0.5px !important;
+    /* Fix main content background */
+    .main > div {
+        background-color: #F0F4FF !important;
     }
-    h2 {
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 1.45rem !important;
-        font-weight: 700 !important;
-        color: #1E293B !important;
+    section.main {
+        background-color: #F0F4FF !important;
     }
-    h3 {
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 1.1rem !important;
+
+    /* Fix sidebar label font size and spacing */
+    section[data-testid="stSidebar"] .stSlider label p,
+    section[data-testid="stSidebar"] .stNumberInput label p,
+    section[data-testid="stSidebar"] .stRadio label p,
+    section[data-testid="stSidebar"] .stCheckbox label p {
+        font-size: 0.82rem !important;
+        color: #CBD5E1 !important;
+        line-height: 1.4 !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Sidebar slider track color */
+    section[data-testid="stSidebar"] .stSlider [data-testid="stThumbValue"] {
+        color: #93C5FD !important;
+        font-size: 0.78rem !important;
         font-weight: 600 !important;
-        color: #334155 !important;
-    }
-    p {
-        font-size: 0.95rem !important;
-        color: #475569 !important;
-        line-height: 1.7 !important;
     }
 
-    /* ── SUBHEADER ── */
-    [data-testid="stSubheader"] {
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 1rem !important;
-        font-weight: 700 !important;
-        color: #1E293B !important;
-        padding-bottom: 0.5rem !important;
-        border-bottom: 2px solid #E2E8F0 !important;
-        margin-bottom: 1rem !important;
-    }
-
-    /* ── DATAFRAMES ── */
-    .stDataFrame {
-        border-radius: 10px !important;
-        overflow: hidden !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
-        border: 1px solid #E2E8F0 !important;
-    }
-
-    /* ── STATIC TABLES ── */
-    table {
-        font-family: 'Inter', sans-serif !important;
-        font-size: 0.88rem !important;
-        width: 100% !important;
-        border-collapse: collapse !important;
-    }
-    thead tr th {
-        background: #0F172A !important;
-        color: #FFFFFF !important;
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 0.72rem !important;
-        font-weight: 700 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 1px !important;
-        padding: 11px 16px !important;
-        border: none !important;
-    }
-    tbody tr td {
-        font-size: 0.88rem !important;
-        color: #334155 !important;
-        padding: 9px 16px !important;
-        border-bottom: 1px solid #F1F5F9 !important;
-    }
-    tbody tr:nth-child(even) td { background: #F8FAFC !important; }
-    tbody tr:hover td {
-        background: #EFF6FF !important;
-        color: #1D4ED8 !important;
-    }
-
-    /* ── BUTTONS ── */
-    .stButton > button {
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 0.9rem !important;
-        font-weight: 600 !important;
-        border-radius: 8px !important;
-        letter-spacing: 0.2px !important;
-        transition: all 0.15s ease !important;
-        padding: 9px 18px !important;
-    }
-    .stButton > button[kind="primary"] {
-        background: #0F172A !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
-    }
-    .stButton > button[kind="primary"]:hover {
-        background: #1D4ED8 !important;
-        transform: translateY(-1px) !important;
-    }
-    .stButton > button[kind="secondary"] {
-        background: #FFFFFF !important;
-        color: #334155 !important;
-        border: 1px solid #E2E8F0 !important;
-    }
-    .stButton > button[kind="secondary"]:hover {
-        border-color: #3B82F6 !important;
-        color: #2563EB !important;
-        transform: translateY(-1px) !important;
-    }
-
-    /* ── DOWNLOAD BUTTON ── */
-    .stDownloadButton > button {
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 0.9rem !important;
-        font-weight: 600 !important;
-        border-radius: 8px !important;
-        background: #10B981 !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        box-shadow: 0 2px 8px rgba(16,185,129,0.3) !important;
-    }
-    .stDownloadButton > button:hover {
-        background: #059669 !important;
-        transform: translateY(-1px) !important;
-    }
-
-    /* ── ALERTS ── */
-    .stAlert {
-        border-radius: 8px !important;
-        font-size: 0.9rem !important;
-        font-weight: 500 !important;
-    }
-
-    /* ── AUTH CARD ── */
-    .auth-card {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        padding: 2.5rem;
-        border-radius: 16px;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-    }
-
-    /* ── CAPTIONS ── */
-    .stCaption p {
-        font-family: 'JetBrains Mono', monospace !important;
-        font-size: 0.75rem !important;
+    /* Fix subheader spacing in sidebar */
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        font-size: 0.82rem !important;
         color: #94A3B8 !important;
+        line-height: 1.5 !important;
     }
 
-    /* ── DIVIDER ── */
-    hr {
-        border: none !important;
-        border-top: 1px solid #E2E8F0 !important;
-        margin: 1.25rem 0 !important;
+    /* Active session banner */
+    section[data-testid="stSidebar"] div[style*="background-color:#1E3A8A"] {
+        background: linear-gradient(135deg, #1D4ED8, #7C3AED) !important;
+        font-size: 0.88rem !important;
+        letter-spacing: 1.5px !important;
+    }
+
+    /* Subheader text in main */
+    .stSubheader, [data-testid="stSubheader"] {
+        font-size: 1.05rem !important;
+        font-weight: 700 !important;
+        color: #1E3A8A !important;
+        border-left: 4px solid #2563EB;
+        padding-left: 10px !important;
+        margin-top: 1.5rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
+
 # --- User Database Simulation ---
 if 'user_db' not in st.session_state:
     st.session_state.user_db = {} 
