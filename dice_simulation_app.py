@@ -98,7 +98,7 @@ capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generat
 # Initialize dynamic operational variables
 uploaded_df = None
 num_days = 1500
-num_members = st.session_state.get("num_members", 9)
+num_members = st.session_state.get("num_members", 7)
 dice_configs = {}
 choke_target_station = None
 activate_choke_release = False
