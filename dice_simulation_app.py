@@ -14,244 +14,464 @@ st.set_page_config(
 # --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-    /* Global Font */
-    html, body, [class*="css"], .stMarkdown, .stText, p, div {
-        font-family: 'Inter', sans-serif;
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+ 
+    /* ── DESIGN TOKENS ── */
+    :root {
+        --slate-950: #020617;
+        --slate-900: #0F172A;
+        --slate-800: #1E293B;
+        --slate-700: #334155;
+        --slate-600: #475569;
+        --slate-400: #94A3B8;
+        --slate-200: #E2E8F0;
+        --slate-100: #F1F5F9;
+        --slate-50:  #F8FAFC;
+        --blue-700:  #1D4ED8;
+        --blue-600:  #2563EB;
+        --blue-500:  #3B82F6;
+        --blue-400:  #60A5FA;
+        --blue-100:  #DBEAFE;
+        --blue-50:   #EFF6FF;
+        --teal-500:  #14B8A6;
+        --teal-400:  #2DD4BF;
+        --amber-400: #FBBF24;
+        --red-500:   #EF4444;
+        --green-500: #10B981;
+        --white:     #FFFFFF;
+        --font-display: 'DM Sans', sans-serif;
+        --font-body:    'Inter', sans-serif;
+        --font-mono:    'JetBrains Mono', monospace;
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+        --radius-xl: 18px;
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+        --shadow-md: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+        --shadow-lg: 0 10px 30px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
+        --shadow-blue: 0 4px 14px rgba(37,99,235,0.25);
     }
-
-    /* Page background */
-    .main { background-color: #F0F4FF; }
+ 
+    /* ── GLOBAL RESET ── */
+    html, body, [class*="css"] {
+        font-family: var(--font-body) !important;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+ 
+    /* ── PAGE BACKGROUND ── */
+    [data-testid="stAppViewContainer"],
+    .main,
+    .main > div,
+    section.main {
+        background-color: var(--slate-50) !important;
+    }
     .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 3rem;
+        padding: 2rem 2.5rem 4rem !important;
+        max-width: 1400px;
     }
-
-    /* Sidebar styling */
+ 
+    /* ══════════════════════════════════════
+       SIDEBAR
+    ══════════════════════════════════════ */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0F172A 0%, #1E3A8A 100%);
+        background: var(--slate-900) !important;
+        border-right: 1px solid var(--slate-800) !important;
+    }
+    section[data-testid="stSidebar"] > div {
+        padding: 0 !important;
     }
     section[data-testid="stSidebar"] * {
-        color: #E2E8F0 !important;
+        color: var(--slate-200) !important;
     }
-    section[data-testid="stSidebar"] .stRadio label,
-    section[data-testid="stSidebar"] .stSlider label,
-    section[data-testid="stSidebar"] .stNumberInput label,
-    section[data-testid="stSidebar"] .stToggle label {
-        color: #CBD5E1 !important;
-        font-size: 0.85rem !important;
-        font-weight: 500 !important;
-        letter-spacing: 0.3px;
-    }
+ 
+    /* Sidebar section headers */
     section[data-testid="stSidebar"] h1,
     section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3 {
-        color: #F8FAFC !important;
-        font-size: 0.95rem !important;
+        font-family: var(--font-display) !important;
+        font-size: 0.7rem !important;
         font-weight: 700 !important;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+        text-transform: uppercase !important;
+        letter-spacing: 2px !important;
+        color: var(--slate-400) !important;
+        margin: 0 0 0.5rem !important;
+        padding: 0 1rem !important;
     }
-
-    /* Metric cards */
-    div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
-        border-radius: 14px;
-        padding: 1.2rem 1.5rem;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
-        border: 1px solid rgba(255,255,255,0.1);
-    }
-    div[data-testid="stMetricValue"] {
-        font-size: 2.4rem !important;
-        font-weight: 800 !important;
-        color: #FFFFFF !important;
-        letter-spacing: -0.5px;
-    }
-    div[data-testid="stMetricLabel"] {
-        font-size: 0.78rem !important;
-        font-weight: 600 !important;
-        color: #BFDBFE !important;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #E8EEFF;
-        border-radius: 12px;
-        padding: 4px;
-        gap: 4px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        font-size: 0.95rem !important;
-        font-weight: 600 !important;
-        padding: 10px 24px !important;
-        border-radius: 8px !important;
-        color: #475569 !important;
-        background-color: transparent !important;
-        border: none !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #1E3A8A !important;
-        color: #FFFFFF !important;
-        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.4) !important;
-    }
-
-    /* Auth card */
-    .auth-card {
-        background: linear-gradient(145deg, #FFFFFF, #F0F6FF);
-        border: 1px solid #BFDBFE;
-        padding: 2.5rem;
-        border-radius: 16px;
-        box-shadow: 0 8px 30px rgba(30, 58, 138, 0.12);
-    }
-
-    /* Section headers in main area */
-    h1 { 
-        font-size: 2rem !important; 
-        font-weight: 800 !important; 
-        color: #0F172A !important;
-        letter-spacing: -0.5px;
-    }
-    h2 { 
-        font-size: 1.5rem !important; 
-        font-weight: 700 !important; 
-        color: #1E3A8A !important;
-    }
-    h3 { 
-        font-size: 1.15rem !important; 
-        font-weight: 600 !important; 
-        color: #1E40AF !important;
-    }
-
-    /* Dataframe */
-    .stDataFrame {
-        border-radius: 10px !important;
-        overflow: hidden;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-        border: 1px solid #DBEAFE !important;
-    }
-
-    /* Buttons */
-    .stButton > button {
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 0.9rem !important;
-        border-radius: 8px !important;
-        letter-spacing: 0.3px;
-        transition: all 0.2s ease;
-    }
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #1E3A8A, #2563EB) !important;
-        border: none !important;
-        box-shadow: 0 3px 10px rgba(37, 99, 235, 0.4) !important;
-    }
-    .stButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 5px 15px rgba(37, 99, 235, 0.5) !important;
-    }
-
-    /* Info / success / warning boxes */
-    .stAlert {
-        border-radius: 10px !important;
-        font-size: 0.9rem !important;
-        font-weight: 500 !important;
-    }
-
-    /* Download button */
-    .stDownloadButton > button {
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 0.88rem !important;
-        border-radius: 8px !important;
-        background: linear-gradient(135deg, #059669, #10B981) !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35) !important;
-    }
-
-    /* Table styling */
-    table {
-        font-size: 0.85rem !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-    thead tr th {
-        background-color: #1E3A8A !important;
-        color: white !important;
-        font-weight: 700 !important;
-        letter-spacing: 0.5px;
-        font-size: 0.8rem !important;
-    }
-    tbody tr:nth-child(even) { background-color: #EFF6FF !important; }
-    tbody tr:hover { background-color: #DBEAFE !important; }
-
-    /* Caption text */
-    .stCaption, caption {
-        font-size: 0.78rem !important;
-        color: #94A3B8 !important;
-    }
-      /* Fix metric columns - equal width, proper sizing */
-    div[data-testid="stMetric"] {
-        min-width: 0 !important;
-        width: 100% !important;
-    }
-    div[data-testid="column"] {
-        padding: 0 0.4rem !important;
-    }
-
-    /* Fix main content background */
-    .main > div {
-        background-color: #F0F4FF !important;
-    }
-    section.main {
-        background-color: #F0F4FF !important;
-    }
-
-    /* Fix sidebar label font size and spacing */
+ 
+    /* Sidebar labels */
+    section[data-testid="stSidebar"] label p,
     section[data-testid="stSidebar"] .stSlider label p,
     section[data-testid="stSidebar"] .stNumberInput label p,
     section[data-testid="stSidebar"] .stRadio label p,
-    section[data-testid="stSidebar"] .stCheckbox label p {
+    section[data-testid="stSidebar"] .stCheckbox label p,
+    section[data-testid="stSidebar"] .stToggle label p {
+        font-family: var(--font-body) !important;
         font-size: 0.82rem !important;
-        color: #CBD5E1 !important;
-        line-height: 1.4 !important;
-        margin-bottom: 2px !important;
-    }
-
-    /* Sidebar slider track color */
-    section[data-testid="stSidebar"] .stSlider [data-testid="stThumbValue"] {
-        color: #93C5FD !important;
-        font-size: 0.78rem !important;
-        font-weight: 600 !important;
-    }
-
-    /* Fix subheader spacing in sidebar */
-    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-        font-size: 0.82rem !important;
-        color: #94A3B8 !important;
+        font-weight: 500 !important;
+        color: var(--slate-200) !important;
+        letter-spacing: 0.2px !important;
         line-height: 1.5 !important;
     }
-
+ 
+    /* Sidebar markdown text */
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        font-size: 0.8rem !important;
+        color: var(--slate-400) !important;
+        line-height: 1.6 !important;
+        padding: 0 1rem !important;
+    }
+ 
+    /* Sidebar divider */
+    section[data-testid="stSidebar"] hr {
+        border-color: var(--slate-800) !important;
+        margin: 0.75rem 1rem !important;
+    }
+ 
+    /* Sidebar number inputs */
+    section[data-testid="stSidebar"] input[type="number"] {
+        background: var(--slate-800) !important;
+        color: var(--white) !important;
+        border: 1px solid var(--slate-700) !important;
+        border-radius: var(--radius-sm) !important;
+        font-family: var(--font-mono) !important;
+        font-size: 0.92rem !important;
+        font-weight: 500 !important;
+        padding: 6px 10px !important;
+    }
+    section[data-testid="stSidebar"] input[type="number"]:focus {
+        border-color: var(--blue-500) !important;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.2) !important;
+        outline: none !important;
+    }
+ 
+    /* Sidebar +/- stepper buttons */
+    section[data-testid="stSidebar"] button[kind="secondary"] {
+        background: var(--slate-700) !important;
+        color: var(--slate-200) !important;
+        border: 1px solid var(--slate-600) !important;
+        border-radius: var(--radius-sm) !important;
+    }
+    section[data-testid="stSidebar"] button[kind="secondary"]:hover {
+        background: var(--slate-600) !important;
+    }
+ 
+    /* Sidebar caption */
+    section[data-testid="stSidebar"] .stCaption p,
+    section[data-testid="stSidebar"] small {
+        font-family: var(--font-mono) !important;
+        font-size: 0.72rem !important;
+        color: var(--slate-400) !important;
+    }
+ 
     /* Active session banner */
     section[data-testid="stSidebar"] div[style*="background-color:#1E3A8A"] {
-        background: linear-gradient(135deg, #1D4ED8, #7C3AED) !important;
-        font-size: 0.88rem !important;
-        letter-spacing: 1.5px !important;
-    }
-
-    /* Subheader text in main */
-    .stSubheader, [data-testid="stSubheader"] {
-        font-size: 1.05rem !important;
+        background: linear-gradient(90deg, var(--blue-700), var(--blue-500)) !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        padding: 14px 20px !important;
+        font-family: var(--font-display) !important;
+        font-size: 0.78rem !important;
         font-weight: 700 !important;
-        color: #1E3A8A !important;
-        border-left: 4px solid #2563EB;
-        padding-left: 10px !important;
-        margin-top: 1.5rem !important;
+        letter-spacing: 2px !important;
+        border-bottom: 1px solid var(--blue-400) !important;
     }
+ 
+    /* ══════════════════════════════════════
+       TABS
+    ══════════════════════════════════════ */
+    .stTabs [data-baseweb="tab-list"] {
+        background: var(--white) !important;
+        border-radius: var(--radius-lg) !important;
+        padding: 5px !important;
+        gap: 3px !important;
+        box-shadow: var(--shadow-sm) !important;
+        border: 1px solid var(--slate-200) !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-family: var(--font-display) !important;
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+        padding: 9px 22px !important;
+        border-radius: var(--radius-md) !important;
+        color: var(--slate-600) !important;
+        background: transparent !important;
+        border: none !important;
+        transition: all 0.15s ease !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: var(--blue-600) !important;
+        background: var(--blue-50) !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background: var(--slate-900) !important;
+        color: var(--white) !important;
+        box-shadow: var(--shadow-md) !important;
+    }
+ 
+    /* ══════════════════════════════════════
+       METRIC CARDS
+    ══════════════════════════════════════ */
+    div[data-testid="stMetric"] {
+        background: var(--white) !important;
+        border-radius: var(--radius-lg) !important;
+        padding: 1.5rem 1.75rem !important;
+        box-shadow: var(--shadow-md) !important;
+        border: 1px solid var(--slate-200) !important;
+        border-top: 3px solid var(--blue-500) !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        transition: box-shadow 0.2s ease !important;
+    }
+    div[data-testid="stMetric"]:hover {
+        box-shadow: var(--shadow-lg) !important;
+    }
+    div[data-testid="stMetricLabel"] p,
+    div[data-testid="stMetric"] label {
+        font-family: var(--font-display) !important;
+        font-size: 0.72rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1.5px !important;
+        color: var(--slate-400) !important;
+        opacity: 1 !important;
+        margin-bottom: 6px !important;
+    }
+    div[data-testid="stMetricValue"] {
+        font-family: var(--font-display) !important;
+        font-size: 2.6rem !important;
+        font-weight: 700 !important;
+        color: var(--slate-900) !important;
+        letter-spacing: -1px !important;
+        line-height: 1.1 !important;
+    }
+    div[data-testid="column"] {
+        padding: 0 0.5rem !important;
+    }
+ 
+    /* ══════════════════════════════════════
+       TYPOGRAPHY — MAIN AREA
+    ══════════════════════════════════════ */
+    h1 {
+        font-family: var(--font-display) !important;
+        font-size: 1.9rem !important;
+        font-weight: 700 !important;
+        color: var(--slate-900) !important;
+        letter-spacing: -0.5px !important;
+        line-height: 1.2 !important;
+    }
+    h2 {
+        font-family: var(--font-display) !important;
+        font-size: 1.45rem !important;
+        font-weight: 700 !important;
+        color: var(--slate-800) !important;
+        letter-spacing: -0.3px !important;
+    }
+    h3 {
+        font-family: var(--font-display) !important;
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        color: var(--slate-700) !important;
+    }
+    p {
+        font-family: var(--font-body) !important;
+        font-size: 0.95rem !important;
+        color: var(--slate-600) !important;
+        line-height: 1.7 !important;
+    }
+ 
+    /* Subheader accent */
+    [data-testid="stSubheader"] {
+        font-family: var(--font-display) !important;
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+        color: var(--slate-800) !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        padding: 0.6rem 0 !important;
+        border-bottom: 2px solid var(--slate-200) !important;
+        margin-bottom: 1rem !important;
+    }
+ 
+    /* ══════════════════════════════════════
+       DATAFRAMES
+    ══════════════════════════════════════ */
+    .stDataFrame {
+        border-radius: var(--radius-md) !important;
+        overflow: hidden !important;
+        box-shadow: var(--shadow-sm) !important;
+        border: 1px solid var(--slate-200) !important;
+    }
+    .stDataFrame thead th {
+        background: var(--slate-900) !important;
+        color: var(--white) !important;
+        font-family: var(--font-display) !important;
+        font-size: 0.78rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        padding: 10px 14px !important;
+    }
+    .stDataFrame tbody td {
+        font-family: var(--font-mono) !important;
+        font-size: 0.88rem !important;
+        color: var(--slate-700) !important;
+        padding: 8px 14px !important;
+    }
+ 
+    /* ══════════════════════════════════════
+       STATIC TABLES (st.table)
+    ══════════════════════════════════════ */
+    table {
+        font-family: var(--font-body) !important;
+        font-size: 0.88rem !important;
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+    thead tr th {
+        background: var(--slate-900) !important;
+        color: var(--white) !important;
+        font-family: var(--font-display) !important;
+        font-size: 0.75rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        padding: 11px 16px !important;
+        border: none !important;
+    }
+    tbody tr td {
+        font-size: 0.88rem !important;
+        color: var(--slate-700) !important;
+        padding: 9px 16px !important;
+        border-bottom: 1px solid var(--slate-100) !important;
+        vertical-align: middle !important;
+    }
+    tbody tr:nth-child(even) td {
+        background: var(--slate-50) !important;
+    }
+    tbody tr:hover td {
+        background: var(--blue-50) !important;
+        color: var(--blue-700) !important;
+    }
+ 
+    /* ══════════════════════════════════════
+       BUTTONS
+    ══════════════════════════════════════ */
+    .stButton > button {
+        font-family: var(--font-display) !important;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
+        border-radius: var(--radius-md) !important;
+        letter-spacing: 0.3px !important;
+        transition: all 0.15s ease !important;
+        padding: 9px 18px !important;
+    }
+    .stButton > button[kind="primary"] {
+        background: var(--slate-900) !important;
+        color: var(--white) !important;
+        border: none !important;
+        box-shadow: var(--shadow-md) !important;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background: var(--blue-700) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: var(--shadow-blue) !important;
+    }
+    .stButton > button[kind="secondary"] {
+        background: var(--white) !important;
+        color: var(--slate-700) !important;
+        border: 1px solid var(--slate-200) !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+    .stButton > button[kind="secondary"]:hover {
+        border-color: var(--blue-400) !important;
+        color: var(--blue-600) !important;
+        transform: translateY(-1px) !important;
+    }
+ 
+    /* Download button */
+    .stDownloadButton > button {
+        font-family: var(--font-display) !important;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
+        border-radius: var(--radius-md) !important;
+        background: var(--green-500) !important;
+        color: var(--white) !important;
+        border: none !important;
+        box-shadow: 0 3px 10px rgba(16,185,129,0.3) !important;
+        padding: 9px 20px !important;
+    }
+    .stDownloadButton > button:hover {
+        background: #059669 !important;
+        transform: translateY(-1px) !important;
+    }
+ 
+    /* ══════════════════════════════════════
+       ALERTS & INFO BOXES
+    ══════════════════════════════════════ */
+    .stAlert {
+        border-radius: var(--radius-md) !important;
+        font-family: var(--font-body) !important;
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+        border-left-width: 4px !important;
+    }
+ 
+    /* ══════════════════════════════════════
+       AUTH CARD
+    ══════════════════════════════════════ */
+    .auth-card {
+        background: var(--white);
+        border: 1px solid var(--slate-200);
+        padding: 2.5rem;
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-lg);
+    }
+ 
+    /* ══════════════════════════════════════
+       CAPTION & MISC
+    ══════════════════════════════════════ */
+    .stCaption p, small {
+        font-family: var(--font-mono) !important;
+        font-size: 0.75rem !important;
+        color: var(--slate-400) !important;
+    }
+ 
+    /* Horizontal rule */
+    hr {
+        border: none !important;
+        border-top: 1px solid var(--slate-200) !important;
+        margin: 1.5rem 0 !important;
+    }
+ 
+    /* Latex */
+    .katex {
+        font-size: 1.05rem !important;
+    }
+ 
+    /* Slider thumb accent */
+    section[data-testid="stSidebar"] .stSlider [role="slider"] {
+        background: var(--blue-500) !important;
+        border: 2px solid var(--white) !important;
+        box-shadow: 0 0 0 2px var(--blue-500) !important;
+    }
+ 
+    /* File uploader */
+    section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
+        background: var(--slate-800) !important;
+        border: 1px dashed var(--slate-600) !important;
+        border-radius: var(--radius-md) !important;
+        padding: 0.5rem !important;
+    }
+ 
+    /* Toggle */
+    section[data-testid="stSidebar"] [data-testid="stToggle"] {
+        accent-color: var(--blue-500) !important;
+    }
+ 
     </style>
 """, unsafe_allow_html=True)
-
 # --- User Database Simulation ---
 if 'user_db' not in st.session_state:
     st.session_state.user_db = {} 
