@@ -14,13 +14,186 @@ st.set_page_config(
 # --- CSS Styling for Premium Institutional Theme ---
 st.markdown("""
     <style>
-    .main .block-container { padding-top: 2rem; }
-    div[data-testid="stMetricValue"] { font-size: 2.2rem; font-weight: 700; color: #1E3A8A; }
-    div[data-testid="stMetricLabel"] { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
-    .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    /* Global Font */
+    html, body, [class*="css"], .stMarkdown, .stText, p, div {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Page background */
+    .main { background-color: #F0F4FF; }
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+
+    /* Sidebar styling */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0F172A 0%, #1E3A8A 100%);
+    }
+    section[data-testid="stSidebar"] * {
+        color: #E2E8F0 !important;
+    }
+    section[data-testid="stSidebar"] .stRadio label,
+    section[data-testid="stSidebar"] .stSlider label,
+    section[data-testid="stSidebar"] .stNumberInput label,
+    section[data-testid="stSidebar"] .stToggle label {
+        color: #CBD5E1 !important;
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+        letter-spacing: 0.3px;
+    }
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 {
+        color: #F8FAFC !important;
+        font-size: 0.95rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Metric cards */
+    div[data-testid="stMetric"] {
+        background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
+        border-radius: 14px;
+        padding: 1.2rem 1.5rem;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 2.4rem !important;
+        font-weight: 800 !important;
+        color: #FFFFFF !important;
+        letter-spacing: -0.5px;
+    }
+    div[data-testid="stMetricLabel"] {
+        font-size: 0.78rem !important;
+        font-weight: 600 !important;
+        color: #BFDBFE !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #E8EEFF;
+        border-radius: 12px;
+        padding: 4px;
+        gap: 4px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+        padding: 10px 24px !important;
+        border-radius: 8px !important;
+        color: #475569 !important;
+        background-color: transparent !important;
+        border: none !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #1E3A8A !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.4) !important;
+    }
+
+    /* Auth card */
+    .auth-card {
+        background: linear-gradient(145deg, #FFFFFF, #F0F6FF);
+        border: 1px solid #BFDBFE;
+        padding: 2.5rem;
+        border-radius: 16px;
+        box-shadow: 0 8px 30px rgba(30, 58, 138, 0.12);
+    }
+
+    /* Section headers in main area */
+    h1 { 
+        font-size: 2rem !important; 
+        font-weight: 800 !important; 
+        color: #0F172A !important;
+        letter-spacing: -0.5px;
+    }
+    h2 { 
+        font-size: 1.5rem !important; 
+        font-weight: 700 !important; 
+        color: #1E3A8A !important;
+    }
+    h3 { 
+        font-size: 1.15rem !important; 
+        font-weight: 600 !important; 
+        color: #1E40AF !important;
+    }
+
+    /* Dataframe */
+    .stDataFrame {
+        border-radius: 10px !important;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+        border: 1px solid #DBEAFE !important;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        border-radius: 8px !important;
+        letter-spacing: 0.3px;
+        transition: all 0.2s ease;
+    }
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #1E3A8A, #2563EB) !important;
+        border: none !important;
+        box-shadow: 0 3px 10px rgba(37, 99, 235, 0.4) !important;
+    }
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 5px 15px rgba(37, 99, 235, 0.5) !important;
+    }
+
+    /* Info / success / warning boxes */
+    .stAlert {
+        border-radius: 10px !important;
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+    }
+
+    /* Download button */
+    .stDownloadButton > button {
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
+        border-radius: 8px !important;
+        background: linear-gradient(135deg, #059669, #10B981) !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35) !important;
+    }
+
+    /* Table styling */
+    table {
+        font-size: 0.85rem !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    thead tr th {
+        background-color: #1E3A8A !important;
+        color: white !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.5px;
+        font-size: 0.8rem !important;
+    }
+    tbody tr:nth-child(even) { background-color: #EFF6FF !important; }
+    tbody tr:hover { background-color: #DBEAFE !important; }
+
+    /* Caption text */
+    .stCaption, caption {
+        font-size: 0.78rem !important;
+        color: #94A3B8 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
+
 
 # --- User Database Simulation ---
 if 'user_db' not in st.session_state:
