@@ -228,21 +228,20 @@ if run_sim_clicked:
             dice_configs['A'] = dice_configs[choke_target_station]
 
         # 1. Capacity Generation/Loading
-        if capacity_mode == "Random Generation":
-            # Ensure this line and everything below is indented by 12 spaces 
-            # (or 3 tabs) relative to the left margin
-            np.random.seed(st.session_state.sim_seed) 
+       if capacity_mode == "Random Generation":
+            np.random.seed(st.session_state.sim_seed)
             dice_rolls = {}
-    
-    for m in members:
-        # Safety check: ensure the station exists in configs, default to (1, 6) if missing
-        if m not in dice_configs:
-            dice_configs[m] = (1, 6)
             
-        if m == 'A' and activate_choke_release and choke_target_station:
-            continue 
+            # This 'for' loop should be at the same indentation level as the lines above
+            for m in members:
+                # This 'if' should be indented further than the 'for' loop
+                if m == 'A' and activate_choke_release and choke_target_station:
+                    continue 
+                dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
             
-        dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
+            # This 'if' (your line 248) must align with the 'for' loop above
+            if activate_choke_release and choke_target_station:
+                dice_rolls['A'] = list(dice_rolls[choke_target_station])
             
             # Apply dynamic Choke Release mirroring if active
             if activate_choke_release and choke_target_station:
