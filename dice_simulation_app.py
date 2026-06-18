@@ -56,6 +56,20 @@ user_record = st.session_state.user_db[current_user]
 st.sidebar.header(f"👤 Active: {current_user}")
 st.sidebar.header("Simulation Settings")
 
+# --- NEW SEED LOGIC ---
+if 'sim_seed' not in st.session_state:
+    st.session_state.sim_seed = None
+
+# Added the requested button/toggle logic
+keep_seed = st.sidebar.toggle("🔒 Keep the same seed (for replication)", value=False)
+
+if not keep_seed:
+    # Generate a new random seed every time the app logic refreshes if not locked
+    st.session_state.sim_seed = np.random.randint(0, 1000000)
+
+st.sidebar.caption(f"Current Seed: {st.session_state.sim_seed}")
+# ----------------------
+
 members_list = [chr(64 + i) for i in range(1, 9)] 
 dice_configs = {m: st.sidebar.slider(f"Dice for {m}", 1, 20, (1, 6)) for m in members_list}
 
@@ -68,6 +82,7 @@ num_members = st.sidebar.number_input("Workstations", min_value=2, value=7, max_
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
+# The "Run" button
 if st.sidebar.button("▶ Run & Save Simulation"):
     st.session_state.trigger_sim = True
 else:
@@ -97,6 +112,9 @@ with tab1:
     st.title("🚀 Live Operations Console")
     
     if st.session_state.get('trigger_sim', False):
+        # Apply the seed before generating any random numbers
+        np.random.seed(st.session_state.sim_seed)
+        
         # 1. Capacity Generation
         dice_rolls = {m: [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)] for m in members}
         df_dice = pd.DataFrame(dice_rolls)
@@ -417,3 +435,11 @@ with tab3:
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
     """)
+
+
+
+
+
+
+
+
