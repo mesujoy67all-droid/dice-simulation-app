@@ -25,6 +25,12 @@ st.markdown("""
     div[data-testid="stTable"] th { font-size: 1.15rem; font-weight: 700; }
     div[data-testid="stTable"] td { font-size: 1.15rem; }
 
+    /* --- Scale ONLY the interactive st.dataframe grids (Dice Rolls / Pennies Movement / WIP History) ---
+         st.dataframe renders its grid on an HTML canvas, so plain font-size CSS has no effect on it.
+         zoom scales the whole rendered widget (including the canvas) as a unit, without touching
+         the sidebar, buttons, or any other part of the app. Adjust 1.3 to taste (e.g. 1.5 for bigger). */
+    div[data-testid="stDataFrame"] { zoom: 1.3; }
+
     </style>
 """, unsafe_allow_html=True)
 
