@@ -6,7 +6,7 @@ import io
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Operations & Flow Dynamics Simulation Platform", 
+    page_title="Dice Simulation Platform", 
     layout="wide", 
     initial_sidebar_state="expanded"
 )
