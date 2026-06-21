@@ -222,20 +222,6 @@ def calculate_entropy(values):
     return -np.sum(p * np.log2(p))
 
 
-def narrow_table_config(df, width="small"):
-    """
-    Builds a column_config dict that keeps numeric/short columns tight
-    instead of letting st.dataframe stretch them across the full width.
-    """
-    config = {}
-    for col in df.columns:
-        if pd.api.types.is_numeric_dtype(df[col]):
-            config[col] = st.column_config.NumberColumn(width=width)
-        else:
-            config[col] = st.column_config.TextColumn(width=width)
-    return config
-
-
 # --- Simulation Processing Engine ---
 if run_sim_clicked:
     if "Import" in capacity_mode and uploaded_df is None:
@@ -456,28 +442,13 @@ with tab1:
         st.markdown("<hr>", unsafe_allow_html=True)
 
         st.subheader("🎲 Table of Dice Rolls (Capacity Applied)")
-        st.dataframe(
-            res["df_dice"],
-            use_container_width=False,
-            column_config=narrow_table_config(res["df_dice"], width="small"),
-            height=380
-        )
+        st.dataframe(res["df_dice"], use_container_width=True)
 
         st.subheader("🪙 Day-wise Pennies Movement")
-        st.dataframe(
-            res["df_pennies_final"],
-            use_container_width=False,
-            column_config=narrow_table_config(res["df_pennies_final"], width="small"),
-            height=380
-        )
+        st.dataframe(res["df_pennies_final"], use_container_width=True)
 
         st.subheader("📦 Work-In-Progress (WIP) History")
-        st.dataframe(
-            res["results_df"],
-            use_container_width=False,
-            column_config=narrow_table_config(res["results_df"], width="medium"),
-            height=380
-        )
+        st.dataframe(res["results_df"], use_container_width=True)
     else:
         st.markdown("""
             <div style="background-color: #EFF6FF; border-left: 5px solid #3B82F6; padding: 1.5rem; border-radius: 4px; margin-top: 2rem;">
