@@ -6,33 +6,128 @@ import io
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Dice Simulation Platform", 
+    page_title="Operations & Flow Dynamics Simulation Platform", 
     layout="wide", 
     initial_sidebar_state="expanded"
 )
 
-# --- CSS Styling for Premium Institutional Theme ---
+# --- CSS Styling: Academic / Institutional Theme ---
 st.markdown("""
     <style>
-    .main .block-container { padding-top: 2rem; }
-    div[data-testid="stMetricValue"] { font-size: 2.2rem; font-weight: 700; color: #1E3A8A; }
-    div[data-testid="stMetricLabel"] { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
-    .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+    /* ===================== Design tokens ===================== */
+    :root {
+        --ink: #1A2742;
+        --ink-soft: #3A4459;
+        --muted: #5C6478;
+        --bg: #FAF9F6;
+        --surface: #FFFFFF;
+        --surface-alt: #F3F0E8;
+        --accent: #A8842C;
+        --accent-soft: #F4ECD8;
+        --border: #E3DFD3;
+        --success: #2F6F4F;
+        --success-bg: #EAF2EC;
+        --warn: #9B6B16;
+        --warn-bg: #FBF1DF;
+        --danger: #9B3B3B;
+        --danger-bg: #F8EBEB;
+    }
 
-    /* --- Larger fonts for st.table (Table A / B / C in Strategic Performance Analytics) --- */
-    div[data-testid="stTable"] table { font-size: 1.15rem; }
-    div[data-testid="stTable"] th { font-size: 1.15rem; font-weight: 700; }
-    div[data-testid="stTable"] td { font-size: 1.15rem; }
+    /* ===================== Layout & base type ===================== */
+    .main .block-container { padding-top: 2.4rem; padding-bottom: 3rem; max-width: 1340px; }
+    h1, h2, h3, h4 { font-family: 'Source Serif 4', Georgia, serif !important; color: var(--ink) !important; letter-spacing: -0.01em; }
+    h1 { font-weight: 700 !important; }
+    h2, h3 { font-weight: 600 !important; }
+    p, li, label, .stMarkdown { color: var(--ink-soft); }
+    hr { border: none !important; border-top: 1px solid var(--border) !important; margin: 1.75rem 0 !important; }
 
-    /* --- Scale ONLY the interactive st.dataframe grids (Dice Rolls / Pennies Movement / WIP History) ---
-         st.dataframe renders its grid on an HTML canvas, so plain font-size CSS has no effect on it.
-         zoom scales the whole rendered widget (including the canvas) as a unit, without touching
-         the sidebar, buttons, or any other part of the app. Adjust 1.3 to taste (e.g. 1.5 for bigger). */
-    div[data-testid="stDataFrame"] { zoom: 1.3; }
+    /* Eyebrow + section header component (used via the section_header() helper) */
+    .section-eyebrow {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        display: block;
+        margin-bottom: 0.3rem;
+    }
+    .section-head { margin: 0.4rem 0 1.1rem 0; }
+    .section-head h2, .section-head h3 { margin: 0 !important; }
 
+    /* ===================== Metric tiles ===================== */
+    div[data-testid="stMetric"] {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-top: 3px solid var(--accent);
+        border-radius: 10px;
+        padding: 1.1rem 1.3rem 0.9rem 1.3rem;
+    }
+    div[data-testid="stMetricValue"] { font-family: 'Source Serif 4', serif; font-size: 2.1rem; font-weight: 700; color: var(--ink); }
+    div[data-testid="stMetricLabel"] { font-family: 'IBM Plex Mono', monospace; font-size: 0.76rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+
+    /* ===================== Tabs ===================== */
+    .stTabs [data-baseweb="tab-list"] { gap: 0.4rem; border-bottom: 1px solid var(--border); }
+    .stTabs [data-baseweb="tab"] { font-family: 'Source Serif 4', serif; font-size: 1.05rem; font-weight: 600; padding: 10px 22px; color: var(--muted); }
+
+    /* ===================== Sidebar ===================== */
+    section[data-testid="stSidebar"] { background: var(--surface-alt); border-right: 1px solid var(--border); }
+    section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
+        font-family: 'IBM Plex Mono', monospace !important;
+        font-size: 0.8rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink) !important;
+        border-bottom: 2px solid var(--accent);
+        padding-bottom: 0.4rem;
+    }
+    .session-badge {
+        background: var(--ink);
+        color: #FAF9F6;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 0.7rem 0.8rem;
+        border-radius: 6px;
+        text-align: center;
+        border-left: 3px solid var(--accent);
+    }
+
+    /* ===================== Auth gateway ===================== */
+    .auth-card { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--accent); padding: 2.75rem; border-radius: 12px; box-shadow: 0 10px 28px -16px rgba(26,39,66,0.25); }
+
+    /* ===================== Alerts ===================== */
+    div[data-testid="stAlert"] { border-radius: 8px; border: 1px solid var(--border); }
+
+    /* ===================== Buttons ===================== */
+    .stButton button, .stDownloadButton button { border-radius: 8px !important; font-weight: 600 !important; }
+
+    /* ===================== Tables (Table A / B / C) ===================== */
+    div[data-testid="stTable"] table { font-size: 1.05rem; border-collapse: collapse; }
+    div[data-testid="stTable"] th {
+        font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.04em;
+        background: var(--surface-alt); color: var(--ink);
+        border-bottom: 2px solid var(--accent);
+    }
+    div[data-testid="stTable"] td { font-family: 'IBM Plex Mono', monospace; font-size: 1rem; color: var(--ink-soft); border-bottom: 1px solid var(--border); }
+
+    /* ===================== Interactive dataframes ===================== */
+    /* zoom scales the canvas-rendered grid (Dice Rolls / Pennies Movement / WIP History) */
+    div[data-testid="stDataFrame"] { zoom: 1.3; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
     </style>
 """, unsafe_allow_html=True)
+
+def section_header(eyebrow: str, title: str, level: str = "h3"):
+    """Renders a small-caps gold eyebrow label above a serif section heading,
+    used throughout the app for a consistent, textbook-like structure."""
+    st.markdown(
+        f"<div class='section-head'><span class='section-eyebrow'>{eyebrow}</span>"
+        f"<{level} style='margin:0;'>{title}</{level}></div>",
+        unsafe_allow_html=True
+    )
 
 # --- User Database Simulation ---
 if 'user_db' not in st.session_state:
