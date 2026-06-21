@@ -83,8 +83,8 @@ st.markdown("""
         padding-bottom: 0.4rem;
     }
     .session-badge {
-        background: var(--ink);
-        color: #FAF9F6;
+        background: var(--surface);
+        color: #A8842C;
         font-family: 'IBM Plex Mono', monospace;
         font-size: 0.78rem;
         letter-spacing: 0.08em;
