@@ -454,13 +454,16 @@ with tab1:
         st.markdown("<hr>", unsafe_allow_html=True)
 
         st.subheader("🎲 Table of Dice Rolls (Capacity Applied)")
-        st.dataframe(res["df_dice"], use_container_width=True)
+        dice_col_config = {col: st.column_config.Column(width="small") for col in res["df_dice"].columns}
+        st.dataframe(res["df_dice"], use_container_width=True, column_config=dice_col_config)
 
         st.subheader("🪙 Day-wise Pennies Movement")
-        st.dataframe(res["df_pennies_final"], use_container_width=True)
+        pennies_col_config = {col: st.column_config.Column(width="small") for col in res["df_pennies_final"].columns}
+        st.dataframe(res["df_pennies_final"], use_container_width=True, column_config=pennies_col_config)
 
         st.subheader("📦 Work-In-Progress (WIP) History")
-        st.dataframe(res["results_df"], use_container_width=True)
+        wip_col_config = {col: st.column_config.Column(width="small") for col in res["results_df"].columns}
+        st.dataframe(res["results_df"], use_container_width=True, column_config=wip_col_config)
     else:
         st.markdown("""
             <div style="background-color: #EFF6FF; border-left: 5px solid #3B82F6; padding: 1.5rem; border-radius: 4px; margin-top: 2rem;">
