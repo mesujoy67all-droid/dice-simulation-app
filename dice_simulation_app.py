@@ -19,6 +19,12 @@ st.markdown("""
     div[data-testid="stMetricLabel"] { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
     .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; padding: 10px 20px; }
     .auth-card { background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+
+    /* --- Larger fonts for st.table (Table A / B / C in Strategic Performance Analytics) --- */
+    div[data-testid="stTable"] table { font-size: 1.15rem; }
+    div[data-testid="stTable"] th { font-size: 1.15rem; font-weight: 700; }
+    div[data-testid="stTable"] td { font-size: 1.15rem; }
+
     </style>
 """, unsafe_allow_html=True)
 
