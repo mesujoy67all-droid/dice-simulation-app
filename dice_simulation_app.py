@@ -36,8 +36,10 @@ st.markdown("""
     /* ===================== Layout & base type ===================== */
     .main .block-container { padding-top: 2.4rem; padding-bottom: 3rem; max-width: 1340px; }
     h1, h2, h3, h4 { font-family: 'Source Serif 4', Georgia, serif !important; color: var(--ink) !important; letter-spacing: -0.01em; }
-    h1 { font-weight: 700 !important; }
-    h2, h3 { font-weight: 600 !important; }
+    h1 { font-weight: 700 !important; font-size: 1.6rem !important; }
+    h2 { font-weight: 600 !important; font-size: 1.25rem !important; }
+    h3 { font-weight: 600 !important; font-size: 1.05rem !important; }
+    h4 { font-weight: 600 !important; font-size: 0.95rem !important; }
     p, li, label, .stMarkdown { color: var(--ink-soft); }
     hr { border: none !important; border-top: 1px solid var(--border) !important; margin: 1.75rem 0 !important; }
 
