@@ -41,7 +41,7 @@ st.markdown("""
     p, li, label, .stMarkdown { color: var(--ink-soft); }
     hr { border: none !important; border-top: 1px solid var(--border) !important; margin: 1.75rem 0 !important; }
 
-    /* Eyebrow + section header component (used via the section_header() helper) */
+    /* Eyebrow + section header component */
     .section-eyebrow {
         font-family: 'IBM Plex Mono', monospace;
         font-size: 0.72rem;
@@ -79,8 +79,16 @@ st.markdown("""
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--ink) !important;
+        background: transparent !important;
         border-bottom: 2px solid var(--accent);
         padding-bottom: 0.4rem;
+    }
+
+    /* Nuke any red/coral Streamlit theme bleed on sidebar headers */
+    section[data-testid="stSidebar"] [data-testid="stHeadingWithActionElements"],
+    section[data-testid="stSidebar"] [data-testid="stHeadingWithActionElements"] * {
+        background: transparent !important;
+        background-color: transparent !important;
     }
     .session-badge {
         background: var(--ink);
@@ -104,6 +112,25 @@ st.markdown("""
     /* ===================== Buttons ===================== */
     .stButton button, .stDownloadButton button { border-radius: 8px !important; font-weight: 600 !important; }
 
+    /* Override Streamlit's default red/coral primary button color */
+    .stButton button[kind="primary"] {
+        background-color: var(--ink) !important;
+        border-color: var(--ink) !important;
+        color: #FAF9F6 !important;
+    }
+    .stButton button[kind="primary"]:hover {
+        background-color: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #FAF9F6 !important;
+    }
+
+    /* Fix sidebar section headers with red/coral background (from Streamlit theming) */
+    section[data-testid="stSidebar"] .stButton button {
+        background-color: var(--ink) !important;
+        border-color: var(--ink) !important;
+        color: #FAF9F6 !important;
+    }
+
     /* ===================== Tables (Table A / B / C) ===================== */
     div[data-testid="stTable"] table { font-size: 1.05rem; border-collapse: collapse; }
     div[data-testid="stTable"] th {
@@ -115,19 +142,45 @@ st.markdown("""
     div[data-testid="stTable"] td { font-family: 'IBM Plex Mono', monospace; font-size: 1rem; color: var(--ink-soft); border-bottom: 1px solid var(--border); }
 
     /* ===================== Interactive dataframes ===================== */
-    /* zoom scales the canvas-rendered grid (Dice Rolls / Pennies Movement / WIP History) */
     div[data-testid="stDataFrame"] { zoom: 1.3; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+
+    /* ===================== Methodology tab: compact headings ===================== */
+    .meth-h1 {
+        font-family: 'Source Serif 4', Georgia, serif;
+        font-size: 1.3rem !important;
+        font-weight: 700;
+        color: var(--ink);
+        margin: 1.2rem 0 0.4rem 0;
+    }
+    .meth-h2 {
+        font-family: 'Source Serif 4', Georgia, serif;
+        font-size: 1.05rem !important;
+        font-weight: 600;
+        color: var(--ink);
+        margin: 1rem 0 0.3rem 0;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.2rem;
+    }
+    .meth-h3 {
+        font-family: 'Source Serif 4', Georgia, serif;
+        font-size: 0.92rem !important;
+        font-weight: 600;
+        color: var(--ink-soft);
+        margin: 0.8rem 0 0.2rem 0;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 def section_header(eyebrow: str, title: str, level: str = "h3"):
-    """Renders a small-caps gold eyebrow label above a serif section heading,
-    used throughout the app for a consistent, textbook-like structure."""
     st.markdown(
         f"<div class='section-head'><span class='section-eyebrow'>{eyebrow}</span>"
         f"<{level} style='margin:0;'>{title}</{level}></div>",
         unsafe_allow_html=True
     )
+
+def meth_h1(text): st.markdown(f"<p class='meth-h1'>{text}</p>", unsafe_allow_html=True)
+def meth_h2(text): st.markdown(f"<p class='meth-h2'>{text}</p>", unsafe_allow_html=True)
+def meth_h3(text): st.markdown(f"<p class='meth-h3'>{text}</p>", unsafe_allow_html=True)
 
 # --- User Database Simulation ---
 if 'user_db' not in st.session_state:
@@ -136,13 +189,23 @@ if 'user_db' not in st.session_state:
 if 'authenticated_user' not in st.session_state:
     st.session_state.authenticated_user = None
 
-# --- PERSISTENCE STORAGE INITIALIZATION ---
 if 'active_results' not in st.session_state:
     st.session_state.active_results = None
 
 # --- Authentication Gateway ---
 def auth_gateway():
-    st.markdown("<div style='text-align: center; padding: 1.5rem 0;'><h1 style='color: #1E3A8A; margin-bottom: 0.5rem;'>🏫 Institutional Executive Simulation Portal</h1><p style='color: #64748B; font-size:1.1rem;'>Strategic Operations & Assembly Flow Dynamics Engine</p></div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='text-align: center; padding: 2rem 0 1rem 0;'>
+        <div style='font-size: 4.5rem; line-height: 1; margin-bottom: 0.6rem;'>🎲</div>
+        <h1 style='color: #1A2742; margin-bottom: 0.3rem; font-family: Georgia, serif; font-size: 2.4rem; font-weight: 700; letter-spacing: -0.01em;'>
+            Dice Simulation Game
+        </h1>
+        <p style='color: #A8842C; font-size: 1rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.4rem;'>
+            Institutional Executive Simulation Portal
+        </p>
+        <p style='color: #64748B; font-size: 0.95rem; margin: 0;'>Strategic Operations &amp; Assembly Flow Dynamics Engine</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     
@@ -186,23 +249,18 @@ if st.session_state.authenticated_user is None:
     auth_gateway()
     st.stop()
 
-# --- Access Current User's Data ---
 current_user = st.session_state.authenticated_user
 user_record = st.session_state.user_db[current_user]
 
-# Determine history count to check current state
 history_count = len(user_record["history"])
 is_base_run = (history_count == 0)
 
-# --- Sidebar: User Controls & Settings ---
 st.sidebar.markdown(f"<div style='background-color:#1E3A8A; padding:10px; border-radius:6px; color:white; text-align:center; font-weight:bold;'>👤 ACTIVE SESSION: {current_user.upper()}</div>", unsafe_allow_html=True)
 
-# SECTION 1: CAPACITY INPUT CONFIGURATION
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ Capacity Input Mode")
 capacity_mode = st.sidebar.radio("Choose Capacity Input Mode:", ["Random Generation", "Import Data File (Excel/CSV)"])
 
-# Initialize dynamic operational variables
 uploaded_df = None
 num_days = 1500
 num_members = st.session_state.get("num_members", 7)
@@ -223,7 +281,6 @@ if capacity_mode == "Random Generation":
     
     members_list = [chr(64 + i) for i in range(1, 10)]
     
-    # "Release the Choke" Configuration for Scenario Runs
     if not is_base_run:
         st.sidebar.subheader("🚨 Intervention Control Room")
         activate_choke_release = st.sidebar.checkbox("🔓 Relieve Bottleneck ('Release Choke' on A)", value=False)
@@ -242,7 +299,6 @@ if capacity_mode == "Random Generation":
 
     num_days = st.sidebar.number_input("Simulation Duration (Days)", min_value=1, value=1500, max_value=3000)
     num_members = st.sidebar.number_input("Active Processing Stations", min_value=2, value=7, max_value=9, key="num_members")
-
 
 else:
     uploaded_file = st.sidebar.file_uploader("Upload operational 'Table of Dice Rolls' data source", type=["xlsx", "xls", "csv"])
@@ -283,32 +339,25 @@ else:
                     continue
                 dice_configs[m] = st.sidebar.slider(f"Operational Range {m}", 1, 20, (1, 6))
 
-# Generate target structures dynamically
 members = [chr(64 + i) for i in range(1, num_members + 1)]
 wip_keys = [f"WIP_{members[i]}{members[i+1]}" for i in range(len(members) - 1)]
 
-# SECTION 2: WIP INITIALIZATION
 st.sidebar.markdown("---")
 st.sidebar.header("📦 Line-Stock WIP Initialization")
 initial_wip = {k: st.sidebar.number_input(f"Initial Buffer {k.replace('WIP_', '')}", min_value=0, value=4) for k in wip_keys}
 
-# SECTION 3: SIMULATION EXECUTION (MAIN BUTTON PLACE)
 st.sidebar.markdown("---")
 st.sidebar.header("🚀 Execution Terminal")
 run_sim_clicked = st.sidebar.button("▶ Compile & Execute Trial", use_container_width=True, type="primary")
 
-# SECTION 4: DATA MAINTENANCE
 st.sidebar.markdown("---")
 st.sidebar.header("🧹 Workspace Maintenance")
 clear_history_clicked = st.sidebar.button("🗑️ Purge Historical Logs", use_container_width=True)
 
-# SECTION 5: ACCOUNT PORTAL
 st.sidebar.markdown("---")
 st.sidebar.header("🚪 Session Management")
 logout_clicked = st.sidebar.button("🚪 Terminate Session & Exit", use_container_width=True)
 
-
-# --- Handle Clear and Logout Button Operations ---
 if clear_history_clicked:
     user_record["history"] = []
     user_record["stations"] = []
@@ -320,44 +369,33 @@ if logout_clicked:
     st.session_state.active_results = None
     st.rerun()
 
-
-# --- Utility Functions ---
 def calculate_entropy(values):
     if len(values) == 0: return 0
     unique, counts = np.unique(values, return_counts=True)
     p = counts / counts.sum()
     return -np.sum(p * np.log2(p))
 
-
-# --- Simulation Processing Engine ---
 if run_sim_clicked:
     if "Import" in capacity_mode and uploaded_df is None:
         st.sidebar.error("Execution Fault: Please upload an analytical capacity CSV/Excel matrix first!")
     else:
-        # Sync configurations if Choke release is chosen
         if activate_choke_release and choke_target_station:
             dice_configs['A'] = dice_configs[choke_target_station]
 
-        # 1. Capacity Generation/Loading
         if capacity_mode == "Random Generation":
             np.random.seed(st.session_state.sim_seed)
             dice_rolls = {}
             
-            # Populate ranges for all stations first
             for m in members:
                 if m == 'A' and activate_choke_release and choke_target_station:
-                    continue # Will copy after loop
+                    continue
                 dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
             
-            # Apply dynamic Choke Release mirroring if active
             if activate_choke_release and choke_target_station:
                 dice_rolls['A'] = list(dice_rolls[choke_target_station])
                 
             df_dice = pd.DataFrame(dice_rolls)
-            
-            # CRITICAL FIX: Force alignment back to standard structural ordering
             df_dice = df_dice.reindex(columns=members)
-            
             df_dice.index = range(1, num_days + 1)
             df_dice.index.name = "Day"
         else:
@@ -369,7 +407,7 @@ if run_sim_clicked:
                 np.random.seed(42) 
                 for m in members:
                     if m == 'A' and activate_choke_release:
-                        continue # Mirror file column values instead
+                        continue
                     low, high = dice_configs[m]
                     if (low != 1) or (high != 6):
                         df_dice[m] = [np.random.randint(low, high + 1) for _ in range(num_days)]
@@ -377,10 +415,8 @@ if run_sim_clicked:
                 if activate_choke_release and choke_target_station:
                     df_dice['A'] = df_dice[choke_target_station].copy()
                     
-            # Enforce structural column tracking layout
             df_dice = df_dice.reindex(columns=members)
 
-        # --- PROCESS LOGGING CONTEXTS (Implicit Daily Run) ---
         applied_configs_desc = []
         for m in members:
             if m == 'A' and activate_choke_release:
@@ -390,7 +426,6 @@ if run_sim_clicked:
 
         dice_info = " | ".join(applied_configs_desc)
 
-        # 2. Simulation Operations Logic
         wip_buffers = {k: initial_wip[k] for k in wip_keys}
         history = []
         total_fg = 0
@@ -438,12 +473,8 @@ if run_sim_clicked:
                 "Day Wise Total FG": daily_fg_out
             })
 
-        # Process Extra Performance Tables Matrix Data
         df_pennies = pd.DataFrame(pennies_movement_data)
-        
-        # Keep Station alignment chronological across output views
         df_pennies = df_pennies.reindex(columns=members)
-        
         df_pennies.index = range(1, num_days + 1)
         df_pennies.index.name = "Day"
         total_output_row = df_pennies.sum().to_frame().T
@@ -458,7 +489,6 @@ if run_sim_clicked:
         sum_total_wip = int(results_df["Daily_Total_WIP"].sum())
         final_wip_inventory = sum(wip_buffers.values())
 
-        # Determine structural logging contexts
         scen_label = "Base-Run" if is_base_run else f"Scenario #{history_count}"
         wip_summary = ", ".join([f"{k.replace('WIP_', '')}= {initial_wip[k]}" for k in wip_keys])
         run_description = f"Days={num_days} | Mode={capacity_mode} | WIP: {wip_summary} | Configs: {dice_info}"
@@ -467,7 +497,6 @@ if run_sim_clicked:
         avg_total_wip_per_day = sum_total_wip / num_days
         calculated_lead_time = round(avg_total_wip_per_day / avg_throughput_rate, 2) if avg_throughput_rate > 0 else 0
 
-        # Append to historical datastores
         user_record["history"].append({
             "Scenarios": scen_label,
             "Days, Initial WIP & Dice Range": run_description,
@@ -483,7 +512,7 @@ if run_sim_clicked:
         days_per_month = 20
         num_months = int(np.ceil(num_days / days_per_month))
         for m in members:
-            station_label = m  # MANDATED: Simplified identifier format
+            station_label = m
             low, high = dice_configs.get(m, (1, 6))
             d_range = f"{low}-{high}"
             if m == 'A' and activate_choke_release:
@@ -514,7 +543,6 @@ if run_sim_clicked:
                 "Entropy Spread σH (Monthly)": spread_h_monthly, "Interpretation": "Variable" if avg_h_monthly > 2.4 else "Stable"
             })
 
-        # Save all UI layouts to memory
         st.session_state.active_results = {
             "scen_label": scen_label,
             "df_dice": df_dice,
@@ -536,7 +564,6 @@ with tab1:
     if st.session_state.active_results is not None:
         res = st.session_state.active_results
 
-        # Metric Presentation Section
         st.markdown(f"### 🏁 Executive Target Summary ({res['scen_label']})")
         m_col1, m_col2, m_col3 = st.columns(3)
         with m_col1:
@@ -593,7 +620,6 @@ with tab2:
         
         if rows_b:
             df_table_b = pd.DataFrame(rows_b).set_index(["Scenario", "Metric"])
-            # Table B renders clean simplified station identifiers dynamically as headers (A, B, C...)
             st.table(df_table_b)
             
         st.markdown("---")
@@ -634,13 +660,13 @@ with tab2:
 
 # --- PAGE 3: METHODOLOGY ---
 with tab3:
-    st.title("📖 Simulation Methodology & Logic")
+    meth_h1("📖 Simulation Methodology & Logic")
     st.markdown("""
-    This page pulls back the curtain on the simulation engine. It explains how **dependency** and **fluctuation** (the core of the Dice Game/Theory of Constraints) are calculated.
+    This page explains how **dependency** and **fluctuation** (the core of the Dice Game / Theory of Constraints) are modelled in this simulation.
     """)
 
-    st.header("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
-    st.markdown("### System Architecture")
+    meth_h2("🔄 The Flow Logic (Station A ➔ Buffer ➔ Station B)")
+    meth_h3("System Architecture")
     st.markdown("The simulation follows a linear production chain where each station is linked by an inventory buffer:")
     st.success("🏭 **Station A** (Source) $\longrightarrow$ 📦 **Buffer AB** (WIP) $\longrightarrow$ ⚙️ **Station B** (Processor) $\longrightarrow$ 📦 **Buffer BC** (WIP) $\longrightarrow$ ⚙️ **Station C**...")
 
@@ -653,26 +679,26 @@ with tab3:
 
     st.markdown("---")
 
-    st.header("📊 Table A: Summary History")
+    meth_h2("📊 Table A: Summary History")
     col1, col2 = st.columns(2)
     with col1:
-        st.write("### Throughput Rate ($TR$)")
+        meth_h3("Throughput Rate ($TR$)")
         st.latex(r"TR = \frac{\sum_{day=1}^{n} \text{Daily Throughput}}{n}")
 
-        st.write("### Average System Entropy ($\bar{H}$)")
+        meth_h3("Average System Entropy ($\\bar{H}$)")
         st.latex(r"\bar{H} = \frac{1}{M} \sum_{i=1}^{M} H_i")
 
     with col2:
-        st.write("### Lead Time ($L$)")
+        meth_h3("Lead Time ($L$)")
         st.markdown("Calculated based on average daily WIP levels relative to throughput rate.")
         st.latex(r"L = \frac{(\sum \text{Daily Total WIP} / n)}{TR}")
 
-        st.write("### Entropy Spread ($\sigma H$)")
+        meth_h3("Entropy Spread ($\sigma H$)")
         st.latex(r"\sigma H = \sqrt{\frac{\sum (H_i - \bar{H})^2}{M}}")
 
     st.markdown("---")
 
-    st.header("🔬 Table B: Station-Level Flow Diagnostics")
+    meth_h2("🔬 Table B: Station-Level Flow Diagnostics")
     st.latex(r"H = -\sum P(x) \log_2 P(x)")
 
     st.markdown("""
