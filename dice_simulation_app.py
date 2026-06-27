@@ -112,20 +112,38 @@ st.markdown("""
     /* ===================== Buttons ===================== */
     .stButton button, .stDownloadButton button { border-radius: 8px !important; font-weight: 600 !important; }
 
-    /* Override Streamlit's default red/coral primary button color */
-    .stButton button[kind="primary"] {
+    /* Main content primary buttons: navy bg */
+    .main .stButton button[kind="primary"] {
         background-color: var(--ink) !important;
         border-color: var(--ink) !important;
         color: #FAF9F6 !important;
     }
-    .stButton button[kind="primary"]:hover {
+    .main .stButton button[kind="primary"]:hover {
         background-color: var(--accent) !important;
         border-color: var(--accent) !important;
         color: #FAF9F6 !important;
     }
 
-    /* Fix sidebar section headers with red/coral background (from Streamlit theming) */
+    /* Sidebar secondary buttons: white bg, dark text, gold border */
     section[data-testid="stSidebar"] .stButton button {
+        background-color: #FFFFFF !important;
+        border: 1.5px solid var(--border) !important;
+        color: var(--ink) !important;
+        font-family: 'IBM Plex Mono', monospace !important;
+        font-size: 0.82rem !important;
+    }
+    section[data-testid="stSidebar"] .stButton button:hover {
+        background-color: var(--accent-soft) !important;
+        border-color: var(--accent) !important;
+        color: var(--ink) !important;
+    }
+    /* Primary run button in sidebar: gold fill */
+    section[data-testid="stSidebar"] .stButton button[kind="primary"] {
+        background-color: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #FFFFFF !important;
+    }
+    section[data-testid="stSidebar"] .stButton button[kind="primary"]:hover {
         background-color: var(--ink) !important;
         border-color: var(--ink) !important;
         color: #FAF9F6 !important;
