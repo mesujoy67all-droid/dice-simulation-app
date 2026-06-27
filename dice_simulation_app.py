@@ -112,19 +112,20 @@ st.markdown("""
     /* ===================== Buttons ===================== */
     .stButton button, .stDownloadButton button { border-radius: 8px !important; font-weight: 600 !important; }
 
-    /* Main content primary buttons: navy bg */
-    .main .stButton button[kind="primary"] {
-        background-color: var(--ink) !important;
-        border-color: var(--ink) !important;
-        color: #FAF9F6 !important;
+    /* ALL primary buttons: light cream bg, navy text, gold border — no red ever */
+    .stButton button[kind="primary"] {
+        background-color: var(--accent-soft) !important;
+        border: 2px solid var(--accent) !important;
+        color: var(--ink) !important;
+        font-weight: 700 !important;
     }
-    .main .stButton button[kind="primary"]:hover {
+    .stButton button[kind="primary"]:hover {
         background-color: var(--accent) !important;
         border-color: var(--accent) !important;
-        color: #FAF9F6 !important;
+        color: #FFFFFF !important;
     }
 
-    /* Sidebar secondary buttons: white bg, dark text, gold border */
+    /* Sidebar secondary buttons: white bg, dark text */
     section[data-testid="stSidebar"] .stButton button {
         background-color: #FFFFFF !important;
         border: 1.5px solid var(--border) !important;
@@ -137,16 +138,17 @@ st.markdown("""
         border-color: var(--accent) !important;
         color: var(--ink) !important;
     }
-    /* Primary run button in sidebar: gold fill */
+    /* Sidebar primary (Run) button: light cream, gold border */
     section[data-testid="stSidebar"] .stButton button[kind="primary"] {
+        background-color: var(--accent-soft) !important;
+        border: 2px solid var(--accent) !important;
+        color: var(--ink) !important;
+        font-weight: 700 !important;
+    }
+    section[data-testid="stSidebar"] .stButton button[kind="primary"]:hover {
         background-color: var(--accent) !important;
         border-color: var(--accent) !important;
         color: #FFFFFF !important;
-    }
-    section[data-testid="stSidebar"] .stButton button[kind="primary"]:hover {
-        background-color: var(--ink) !important;
-        border-color: var(--ink) !important;
-        color: #FAF9F6 !important;
     }
 
     /* ===================== Tables (Table A / B / C) ===================== */
