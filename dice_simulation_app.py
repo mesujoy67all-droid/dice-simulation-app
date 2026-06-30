@@ -608,6 +608,25 @@ with tab1:
         st.subheader("📦 Work-In-Progress (WIP) History")
         wip_col_config = {col: st.column_config.Column(width="small") for col in res["results_df"].columns}
         st.dataframe(res["results_df"], use_container_width=True, column_config=wip_col_config)
+
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.subheader("📥 Export Live Console Tables")
+        st.caption("Download the Dice Rolls, Pennies Movement, and WIP History tables together in a single Excel workbook (one sheet each).")
+
+        live_console_output = io.BytesIO()
+        with pd.ExcelWriter(live_console_output, engine='xlsxwriter') as writer:
+            res["df_dice"].to_excel(writer, sheet_name='Dice Rolls')
+            res["df_pennies_final"].to_excel(writer, sheet_name='Pennies Movement')
+            res["results_df"].to_excel(writer, sheet_name='WIP History')
+        live_console_excel_data = live_console_output.getvalue()
+
+        st.download_button(
+            label="⬇️ Download All Tables (Excel)",
+            data=live_console_excel_data,
+            file_name=f"Live_Console_{res['scen_label'].replace(' ', '_')}_{current_user}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
     else:
         st.markdown("""
             <div style="background-color: #EFF6FF; border-left: 5px solid #3B82F6; padding: 1.5rem; border-radius: 4px; margin-top: 2rem;">
