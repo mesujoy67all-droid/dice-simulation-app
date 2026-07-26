@@ -743,6 +743,11 @@ with tab3:
             base_ranges = stn_df[stn_df["Scenario"] == "Base-Run"].set_index("Station")["Dice Range"].to_dict()
 
             TARGET_GAIN_PCT = 5.0
+            TOTAL_STATIONS = len(members)
+            base_avg_wip = base_row["Avg WIP (W_avg)"]
+
+            def clamp(x, lo=0.0, hi=100.0):
+                return max(lo, min(hi, x))
 
             eval_rows = []
             for _, row in hist_df.iterrows():
@@ -761,29 +766,39 @@ with tab3:
                 is_base = (scen == "Base-Run")
                 meets_target = (not is_base) and (gain_pct >= TARGET_GAIN_PCT)
 
-                # Efficiency = throughput gain earned per capacity change made.
-                # Higher = more gain from fewer targeted interventions.
                 if is_base:
-                    efficiency = None
+                    tp_score = cap_score = wip_score = total_score = None
                 else:
-                    efficiency = gain_pct / max(num_changes, 1)
+                    # Throughput Score (weight 50): 0 at no gain, 100 once the 5% target is reached.
+                    # No bonus past 100 -- overshooting the target isn't rewarded further.
+                    tp_score = clamp((gain_pct / TARGET_GAIN_PCT) * 100)
+
+                    # Capacity Score (weight 30): % of stations left untouched. Fewer changes = higher score.
+                    cap_score = clamp(100 * (1 - num_changes / TOTAL_STATIONS))
+
+                    # WIP Score (weight 20): centered at 50 (= no change in WIP vs base).
+                    # Reducing avg WIP earns bonus points, increasing it costs points.
+                    wip_improvement_pct = ((base_avg_wip - avg_wip) / base_avg_wip * 100) if base_avg_wip > 0 else 0.0
+                    wip_score = clamp(50 + wip_improvement_pct)
+
+                    total_score = 0.5 * tp_score + 0.3 * cap_score + 0.2 * wip_score
 
                 if is_base:
                     target_flag, badge_class, recommendation = "➖", "rec-base", "Baseline"
-                elif not meets_target:
-                    target_flag, badge_class, recommendation = "❌", "rec-fail", "Below Target"
                 else:
-                    if efficiency >= 1.5:
-                        stars = "⭐⭐⭐⭐⭐"
-                    elif efficiency >= 1.0:
-                        stars = "⭐⭐⭐⭐"
-                    elif efficiency >= 0.5:
-                        stars = "⭐⭐⭐"
-                    elif efficiency >= 0.2:
-                        stars = "⭐⭐"
+                    target_flag = "✅" if meets_target else "❌"
+                    if total_score >= 85:
+                        tier = "⭐⭐⭐⭐⭐ Excellent"
+                    elif total_score >= 70:
+                        tier = "⭐⭐⭐⭐ Strong"
+                    elif total_score >= 55:
+                        tier = "⭐⭐⭐ Good"
+                    elif total_score >= 40:
+                        tier = "⭐⭐ Marginal"
                     else:
-                        stars = "⭐"
-                    target_flag, badge_class, recommendation = "✅", "rec-gold", stars
+                        tier = "⭐ Weak"
+                    badge_class = "rec-gold" if meets_target else "rec-fail"
+                    recommendation = tier if meets_target else f"❌ Below Target ({tier})"
 
                 eval_rows.append({
                     "Scenario": scen,
@@ -794,7 +809,10 @@ with tab3:
                     "Meets 5% Target?": target_flag,
                     "Avg WIP": avg_wip,
                     "Lead Time": lead_time,
-                    "Efficiency (Gain % / Change)": round(efficiency, 2) if efficiency is not None else "—",
+                    "Throughput Score (50%)": round(tp_score, 1) if tp_score is not None else "—",
+                    "Capacity Score (30%)": round(cap_score, 1) if cap_score is not None else "—",
+                    "WIP Score (20%)": round(wip_score, 1) if wip_score is not None else "—",
+                    "Total Score": round(total_score, 1) if total_score is not None else "—",
                     "_badge_class": badge_class,
                     "Recommendation": recommendation
                 })
@@ -802,6 +820,7 @@ with tab3:
             eval_df = pd.DataFrame(eval_rows)
 
             # --- Summary metrics ---
+            scored = eval_df[eval_df["Total Score"] != "—"].copy()
             qualifying = eval_df[eval_df["Meets 5% Target?"] == "✅"].copy()
             m1, m2, m3, m4 = st.columns(4)
             with m1:
@@ -811,28 +830,25 @@ with tab3:
             with m3:
                 st.metric("Scenarios Meeting Target", f"{len(qualifying)}")
             with m4:
-                if not qualifying.empty:
-                    best = qualifying.sort_values(
-                        ["Efficiency (Gain % / Change)", "Gain vs Base (%)"], ascending=[False, False]
-                    ).iloc[0]
-                    st.metric("Most Efficient Scenario", best["Scenario"])
+                if not scored.empty:
+                    best = scored.sort_values("Total Score", ascending=False).iloc[0]
+                    st.metric("Top-Scoring Scenario", f"{best['Scenario']} ({best['Total Score']})")
                 else:
-                    st.metric("Most Efficient Scenario", "—")
+                    st.metric("Top-Scoring Scenario", "—")
 
             st.markdown("<hr>", unsafe_allow_html=True)
             st.subheader("Table D: Optimization Scorecard")
+            st.caption("Score = 50 × Throughput Score + 30 × Capacity Score + 20 × WIP Score  (each sub-score is 0–100, so Total Score is out of 100)")
 
             display_df = eval_df.drop(columns=["_badge_class"]).set_index("Scenario")
             st.dataframe(display_df, use_container_width=True)
 
             if not qualifying.empty:
-                best = qualifying.sort_values(
-                    ["Efficiency (Gain % / Change)", "Gain vs Base (%)"], ascending=[False, False]
-                ).iloc[0]
+                best = qualifying.sort_values("Total Score", ascending=False).iloc[0]
                 st.success(
-                    f"🏆 **{best['Scenario']}** is the most efficient scenario meeting the target: "
-                    f"**+{best['Gain vs Base (%)']}%** throughput with just **{best['# Changes']}** capacity "
-                    f"change(s) ({best['Capacity Changes']})."
+                    f"🏆 **{best['Scenario']}** has the best overall Score ({best['Total Score']}/100) among scenarios "
+                    f"meeting the target: **+{best['Gain vs Base (%)']}%** throughput with **{best['# Changes']}** "
+                    f"capacity change(s) ({best['Capacity Changes']}) and a WIP Score of {best['WIP Score (20%)']}."
                 )
             else:
                 st.warning("No scenario has reached the 5% throughput target yet. Try widening the dice range on the current bottleneck station rather than every station.")
@@ -853,12 +869,15 @@ with tab3:
 
             with st.expander("📐 How the scorecard is calculated"):
                 st.markdown("""
+**Score = 50 × Throughput Score + 30 × Capacity Score + 20 × WIP Score** (Total Score out of 100)
+
 - **Capacity Changes**: stations whose dice range in a scenario differs from that same station's range in the Base-Run.
 - **Gain vs Base (%)**: `(Scenario Throughput − Base Throughput) / Base Throughput × 100`.
-- **Meets 5% Target?**: ✅ if Gain vs Base ≥ 5%.
-- **Efficiency (Gain % / Change)**: throughput gain earned per capacity change made — rewards *targeted* improvements over blanket upgrades.
-  - ⭐⭐⭐⭐⭐ ≥ 1.5 · ⭐⭐⭐⭐ ≥ 1.0 · ⭐⭐⭐ ≥ 0.5 · ⭐⭐ ≥ 0.2 · ⭐ below that (all require meeting the 5% target first).
-- Scenarios that don't reach the 5% target are marked **Below Target** regardless of how many stations were changed — more changes without a real throughput gain isn't rewarded.
+- **Meets 5% Target?**: ✅ if Gain vs Base ≥ 5% — shown regardless of Total Score, so a high-scoring scenario that hasn't hit the target is still clearly flagged.
+- **Throughput Score (0–100)**: `min(Gain% / 5%, 1) × 100`. Reaches 100 exactly at the 5% target; no extra credit for overshooting it.
+- **Capacity Score (0–100)**: `100 × (1 − Changes / Total Stations)`. Rewards touching fewer stations — 1 change out of 7 stations scores ~86, changing all 7 scores 0.
+- **WIP Score (0–100)**: centered at 50 = "WIP unchanged from base." `clamp(50 + %WIP reduction vs base, 0, 100)` — reducing average WIP earns bonus points above 50, increasing it costs points below 50.
+- **Tiers** (only applied once the 5% target is met): ⭐⭐⭐⭐⭐ ≥ 85 · ⭐⭐⭐⭐ ≥ 70 · ⭐⭐⭐ ≥ 55 · ⭐⭐ ≥ 40 · ⭐ below that. Scenarios below target still show their tier in parentheses for reference, but are labeled **Below Target** first.
                 """)
 
 # --- TAB 4: METHODOLOGY ---
@@ -921,15 +940,33 @@ with tab4:
     """)
     st.info("""
     **The real objective:** reach at least a **5% throughput increase** over the Base-Run using the
-    **fewest capacity changes possible.** This forces students to identify the binding constraint(s),
-    resize only those, re-run, and check whether one more change is actually worth it.
+    **fewest capacity changes possible**, without inflating WIP inventory to get there. This forces
+    students to identify the binding constraint(s), resize only those, re-run, and check whether one
+    more change is actually worth it.
     """)
-    st.latex(r"\text{Gain \%} = \frac{\text{Throughput}_{\text{scenario}} - \text{Throughput}_{\text{base}}}{\text{Throughput}_{\text{base}}} \times 100")
-    st.latex(r"\text{Efficiency} = \frac{\text{Gain \%}}{\max(\text{Capacity Changes},\ 1)}")
+
+    meth_h3("The Weighted Score")
+    st.latex(r"\text{Score} = 50 \times \text{Throughput Score} + 30 \times \text{Capacity Score} + 20 \times \text{WIP Score}")
+    st.markdown("Each sub-score is bounded 0–100, so the Total Score is out of 100. The weights reflect what matters most: hitting the throughput target (50%), doing it with minimal capacity changes (30%), and not bloating inventory to get there (20%).")
+
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        meth_h3("Throughput Score (50%)")
+        st.latex(r"\min\!\left(\frac{\text{Gain \%}}{5\%},\ 1\right) \times 100")
+        st.caption("Gain % = (Scenario TP − Base TP) / Base TP × 100. Reaches 100 exactly at the 5% target — no bonus for overshooting.")
+    with col_b:
+        meth_h3("Capacity Score (30%)")
+        st.latex(r"100 \times \left(1 - \frac{\text{Changes}}{\text{Total Stations}}\right)")
+        st.caption("Rewards touching fewer stations. 1 change out of 7 stations ≈ 86; changing all 7 stations = 0.")
+    with col_c:
+        meth_h3("WIP Score (20%)")
+        st.latex(r"\text{clamp}\big(50 + \%\Delta\text{WIP}_{\text{base}\to\text{scenario}},\ 0,\ 100\big)")
+        st.caption("Centered at 50 = WIP unchanged from base. Reducing WIP earns bonus points; increasing it costs points.")
+
     st.markdown("""
-    A scenario only qualifies once Gain % ≥ 5. Among qualifying scenarios, **Efficiency** ranks them —
-    a scenario that hits +6% by changing one station beats a scenario that hits +8% by changing five,
-    because it demonstrates sharper diagnosis of the true bottleneck. Star rating and Avg WIP / Lead
-    Time (pulled directly from Table A) give a secondary read on whether the "efficient" fix also
-    produced a healthier, lower-inventory system.
+    A scenario only counts as **meeting the target** once Gain % ≥ 5 — that flag is always shown
+    alongside the Total Score, so a scenario can't disguise a missed target behind a decent Capacity
+    or WIP Score. Among scenarios that do meet the target, the Total Score ranks them: a scenario that
+    hits +6% with one targeted change and a leaner buffer will out-score one that hits +8% by widening
+    every station's dice range and stacking up WIP to get there.
     """)
