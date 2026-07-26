@@ -190,6 +190,20 @@ st.markdown("""
         color: var(--ink-soft);
         margin: 0.8rem 0 0.2rem 0;
     }
+
+    /* ===================== Optimization tab: star badges ===================== */
+    .rec-badge {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.85rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .rec-gold   { background: var(--accent-soft); color: var(--ink); border: 1px solid var(--accent); }
+    .rec-fail   { background: var(--danger-bg);   color: var(--danger); border: 1px solid var(--danger); }
+    .rec-base   { background: var(--surface-alt); color: var(--muted); border: 1px solid var(--border); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -577,7 +591,12 @@ if run_sim_clicked:
         st.rerun()
 
 # --- Application Tabs ---
-tab1, tab2, tab3 = st.tabs(["🚀 Live Operations Console", "📊 Strategic Performance Analytics", "📖 Methodology"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🚀 Live Operations Console",
+    "📊 Strategic Performance Analytics",
+    "🎯 Optimization Evaluation",
+    "📖 Methodology"
+])
 
 with tab1:
     st.markdown("<h2 style='color:#1E3A8A; margin-top:10px;'>🚀 Operational Execution Cockpit</h2>", unsafe_allow_html=True)
@@ -699,8 +718,151 @@ with tab2:
     else:
         st.info("No recorded history found for this User ID.")
 
-# --- PAGE 3: METHODOLOGY ---
+# --- TAB 3: OPTIMIZATION EVALUATION ---
 with tab3:
+    st.markdown("<h2 style='color:#1E3A8A; margin-top:10px;'>🎯 Optimization Evaluation</h2>", unsafe_allow_html=True)
+    st.write(
+        "Every scenario is scored against a single learning objective: **achieve at least a 5% increase "
+        "in throughput over the Base-Run while changing the fewest possible stations.** This turns the "
+        "exercise into a targeting problem — improving the right station(s), not every station."
+    )
+
+    if not user_record["history"]:
+        st.info("No recorded history yet. Run a **Base-Run** first, then run one or more scenarios to evaluate against the target.")
+    else:
+        hist_df = pd.DataFrame(user_record["history"])
+        stn_df = pd.DataFrame(user_record["stations"])
+
+        base_rows = hist_df[hist_df["Scenarios"] == "Base-Run"]
+
+        if base_rows.empty:
+            st.warning("⚠️ No **Base-Run** found. Purge history and run a fresh Base-Run first — every comparison here is measured against it.")
+        else:
+            base_row = base_rows.iloc[0]
+            base_throughput = base_row["Throughput"]
+            base_ranges = stn_df[stn_df["Scenario"] == "Base-Run"].set_index("Station")["Dice Range"].to_dict()
+
+            TARGET_GAIN_PCT = 5.0
+
+            eval_rows = []
+            for _, row in hist_df.iterrows():
+                scen = row["Scenarios"]
+                tp = row["Throughput"]
+                avg_wip = row["Avg WIP (W_avg)"]
+                lead_time = row["Lead Time (L = Avg WIP / TR)"]
+
+                gain_pct = ((tp - base_throughput) / base_throughput * 100) if base_throughput > 0 else 0.0
+
+                scen_ranges = stn_df[stn_df["Scenario"] == scen].set_index("Station")["Dice Range"].to_dict()
+                changed_stations = sorted([s for s in scen_ranges if scen_ranges.get(s) != base_ranges.get(s)]) \
+                    if scen != "Base-Run" else []
+                num_changes = len(changed_stations)
+
+                is_base = (scen == "Base-Run")
+                meets_target = (not is_base) and (gain_pct >= TARGET_GAIN_PCT)
+
+                # Efficiency = throughput gain earned per capacity change made.
+                # Higher = more gain from fewer targeted interventions.
+                if is_base:
+                    efficiency = None
+                else:
+                    efficiency = gain_pct / max(num_changes, 1)
+
+                if is_base:
+                    target_flag, badge_class, recommendation = "➖", "rec-base", "Baseline"
+                elif not meets_target:
+                    target_flag, badge_class, recommendation = "❌", "rec-fail", "Below Target"
+                else:
+                    if efficiency >= 1.5:
+                        stars = "⭐⭐⭐⭐⭐"
+                    elif efficiency >= 1.0:
+                        stars = "⭐⭐⭐⭐"
+                    elif efficiency >= 0.5:
+                        stars = "⭐⭐⭐"
+                    elif efficiency >= 0.2:
+                        stars = "⭐⭐"
+                    else:
+                        stars = "⭐"
+                    target_flag, badge_class, recommendation = "✅", "rec-gold", stars
+
+                eval_rows.append({
+                    "Scenario": scen,
+                    "Capacity Changes": ", ".join(changed_stations) if changed_stations else ("—" if is_base else "None"),
+                    "# Changes": num_changes,
+                    "Throughput": int(tp),
+                    "Gain vs Base (%)": round(gain_pct, 2),
+                    "Meets 5% Target?": target_flag,
+                    "Avg WIP": avg_wip,
+                    "Lead Time": lead_time,
+                    "Efficiency (Gain % / Change)": round(efficiency, 2) if efficiency is not None else "—",
+                    "_badge_class": badge_class,
+                    "Recommendation": recommendation
+                })
+
+            eval_df = pd.DataFrame(eval_rows)
+
+            # --- Summary metrics ---
+            qualifying = eval_df[eval_df["Meets 5% Target?"] == "✅"].copy()
+            m1, m2, m3, m4 = st.columns(4)
+            with m1:
+                st.metric("Base Throughput", f"{int(base_throughput)} units")
+            with m2:
+                st.metric("Scenarios Run", f"{len(eval_df) - 1}")
+            with m3:
+                st.metric("Scenarios Meeting Target", f"{len(qualifying)}")
+            with m4:
+                if not qualifying.empty:
+                    best = qualifying.sort_values(
+                        ["Efficiency (Gain % / Change)", "Gain vs Base (%)"], ascending=[False, False]
+                    ).iloc[0]
+                    st.metric("Most Efficient Scenario", best["Scenario"])
+                else:
+                    st.metric("Most Efficient Scenario", "—")
+
+            st.markdown("<hr>", unsafe_allow_html=True)
+            st.subheader("Table D: Optimization Scorecard")
+
+            display_df = eval_df.drop(columns=["_badge_class"]).set_index("Scenario")
+            st.dataframe(display_df, use_container_width=True)
+
+            if not qualifying.empty:
+                best = qualifying.sort_values(
+                    ["Efficiency (Gain % / Change)", "Gain vs Base (%)"], ascending=[False, False]
+                ).iloc[0]
+                st.success(
+                    f"🏆 **{best['Scenario']}** is the most efficient scenario meeting the target: "
+                    f"**+{best['Gain vs Base (%)']}%** throughput with just **{best['# Changes']}** capacity "
+                    f"change(s) ({best['Capacity Changes']})."
+                )
+            else:
+                st.warning("No scenario has reached the 5% throughput target yet. Try widening the dice range on the current bottleneck station rather than every station.")
+
+            st.markdown("---")
+            st.subheader("📥 Export Optimization Scorecard")
+            opt_output = io.BytesIO()
+            with pd.ExcelWriter(opt_output, engine='xlsxwriter') as writer:
+                display_df.to_excel(writer, sheet_name='Optimization Scorecard')
+            opt_excel_data = opt_output.getvalue()
+            st.download_button(
+                label="⬇️ Download Scorecard (Excel)",
+                data=opt_excel_data,
+                file_name=f"Optimization_Scorecard_{current_user}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+
+            with st.expander("📐 How the scorecard is calculated"):
+                st.markdown("""
+- **Capacity Changes**: stations whose dice range in a scenario differs from that same station's range in the Base-Run.
+- **Gain vs Base (%)**: `(Scenario Throughput − Base Throughput) / Base Throughput × 100`.
+- **Meets 5% Target?**: ✅ if Gain vs Base ≥ 5%.
+- **Efficiency (Gain % / Change)**: throughput gain earned per capacity change made — rewards *targeted* improvements over blanket upgrades.
+  - ⭐⭐⭐⭐⭐ ≥ 1.5 · ⭐⭐⭐⭐ ≥ 1.0 · ⭐⭐⭐ ≥ 0.5 · ⭐⭐ ≥ 0.2 · ⭐ below that (all require meeting the 5% target first).
+- Scenarios that don't reach the 5% target are marked **Below Target** regardless of how many stations were changed — more changes without a real throughput gain isn't rewarded.
+                """)
+
+# --- TAB 4: METHODOLOGY ---
+with tab4:
     meth_h1("📖 Simulation Methodology & Logic")
     st.markdown("""
     This page explains how **dependency** and **fluctuation** (the core of the Dice Game / Theory of Constraints) are modelled in this simulation.
@@ -748,4 +910,26 @@ with tab3:
     * **Entropy ($H_i$):**
         * **Stable (< 2.4):** Predictable output.
         * **Variable (≥ 2.4):** High 'jitter' or chaos.
+    """)
+
+    st.markdown("---")
+
+    meth_h2("🎯 Table D: Optimization Scorecard")
+    st.markdown("""
+    The naive learning objective — *"maximize throughput"* — invites students to widen every station's dice
+    range at once. It works, but it doesn't teach anything about **where** constraints actually live.
+    """)
+    st.info("""
+    **The real objective:** reach at least a **5% throughput increase** over the Base-Run using the
+    **fewest capacity changes possible.** This forces students to identify the binding constraint(s),
+    resize only those, re-run, and check whether one more change is actually worth it.
+    """)
+    st.latex(r"\text{Gain \%} = \frac{\text{Throughput}_{\text{scenario}} - \text{Throughput}_{\text{base}}}{\text{Throughput}_{\text{base}}} \times 100")
+    st.latex(r"\text{Efficiency} = \frac{\text{Gain \%}}{\max(\text{Capacity Changes},\ 1)}")
+    st.markdown("""
+    A scenario only qualifies once Gain % ≥ 5. Among qualifying scenarios, **Efficiency** ranks them —
+    a scenario that hits +6% by changing one station beats a scenario that hits +8% by changing five,
+    because it demonstrates sharper diagnosis of the true bottleneck. Star rating and Avg WIP / Lead
+    Time (pulled directly from Table A) give a secondary read on whether the "efficient" fix also
+    produced a healthier, lower-inventory system.
     """)
