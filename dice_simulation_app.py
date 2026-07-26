@@ -787,18 +787,25 @@ with tab3:
                     target_flag, badge_class, recommendation = "➖", "rec-base", "Baseline"
                 else:
                     target_flag = "✅" if meets_target else "❌"
-                    if total_score >= 85:
-                        tier = "⭐⭐⭐⭐⭐ Excellent"
-                    elif total_score >= 70:
-                        tier = "⭐⭐⭐⭐ Strong"
-                    elif total_score >= 55:
-                        tier = "⭐⭐⭐ Good"
-                    elif total_score >= 40:
-                        tier = "⭐⭐ Marginal"
+                    if meets_target:
+                        # Quality tiers (⭐ labels) are ONLY ever awarded to scenarios that meet the
+                        # 5% target. A failing scenario must never be able to out-rank a passing one
+                        # by tier name, even if its raw Total Score happens to be numerically higher.
+                        if total_score >= 85:
+                            tier = "⭐⭐⭐⭐⭐ Excellent"
+                        elif total_score >= 70:
+                            tier = "⭐⭐⭐⭐ Strong"
+                        elif total_score >= 55:
+                            tier = "⭐⭐⭐ Good"
+                        elif total_score >= 40:
+                            tier = "⭐⭐ Marginal"
+                        else:
+                            tier = "⭐ Weak"
+                        badge_class = "rec-gold"
+                        recommendation = tier
                     else:
-                        tier = "⭐ Weak"
-                    badge_class = "rec-gold" if meets_target else "rec-fail"
-                    recommendation = tier if meets_target else f"❌ Below Target ({tier})"
+                        badge_class = "rec-fail"
+                        recommendation = f"❌ Below Target (Score: {total_score:.1f}/100)"
 
                 eval_rows.append({
                     "Scenario": scen,
@@ -877,7 +884,7 @@ with tab3:
 - **Throughput Score (0–100)**: `min(Gain% / 5%, 1) × 100`. Reaches 100 exactly at the 5% target; no extra credit for overshooting it.
 - **Capacity Score (0–100)**: `100 × (1 − Changes / Total Stations)`. Rewards touching fewer stations — 1 change out of 7 stations scores ~86, changing all 7 scores 0.
 - **WIP Score (0–100)**: centered at 50 = "WIP unchanged from base." `clamp(50 + %WIP reduction vs base, 0, 100)` — reducing average WIP earns bonus points above 50, increasing it costs points below 50.
-- **Tiers** (only applied once the 5% target is met): ⭐⭐⭐⭐⭐ ≥ 85 · ⭐⭐⭐⭐ ≥ 70 · ⭐⭐⭐ ≥ 55 · ⭐⭐ ≥ 40 · ⭐ below that. Scenarios below target still show their tier in parentheses for reference, but are labeled **Below Target** first.
+- **Tiers**: ⭐⭐⭐⭐⭐ ≥ 85 · ⭐⭐⭐⭐ ≥ 70 · ⭐⭐⭐ ≥ 55 · ⭐⭐ ≥ 40 · ⭐ below that. **Tiers are only ever assigned to scenarios that meet the 5% target** — a scenario that misses the target always shows as "Below Target (Score: X/100)" with no quality label, even if its raw Total Score is numerically high. This keeps a failing scenario from ever appearing to out-rank a passing one.
                 """)
 
 # --- TAB 4: METHODOLOGY ---
