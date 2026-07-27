@@ -204,6 +204,55 @@ st.markdown("""
     .rec-gold   { background: var(--accent-soft); color: var(--ink); border: 1px solid var(--accent); }
     .rec-fail   { background: var(--danger-bg);   color: var(--danger); border: 1px solid var(--danger); }
     .rec-base   { background: var(--surface-alt); color: var(--muted); border: 1px solid var(--border); }
+
+    /* ===================== Evaluation tables (Performance Gate / Ranking) ===================== */
+    .eval-table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        margin: 0.5rem 0 1.25rem 0;
+    }
+    table.eval-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    table.eval-table th {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--ink);
+        background: var(--surface-alt);
+        border-bottom: 2px solid var(--accent);
+        padding: 0.65rem 0.85rem;
+        text-align: left;
+        white-space: nowrap;
+    }
+    table.eval-table td {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.88rem;
+        color: var(--ink-soft);
+        border-bottom: 1px solid var(--border);
+        padding: 0.6rem 0.85rem;
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+    table.eval-table tr:last-child td { border-bottom: none; }
+    table.eval-table tr:hover td { background: var(--accent-soft); }
+    table.eval-table td.scen-cell { font-weight: 700; color: var(--ink); white-space: normal; }
+    .eval-pill {
+        display: inline-block;
+        padding: 0.18rem 0.6rem;
+        border-radius: 999px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.78rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .eval-pill-pass { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+    .eval-pill-fail { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+    .eval-num-ok   { color: var(--success); font-weight: 700; }
+    .eval-num-fail { color: var(--danger);  font-weight: 700; }
+    .eval-medal { font-size: 1.1rem; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -777,23 +826,40 @@ with tab3:
                     "# Changes": num_changes,
                     "Throughput": int(tp),
                     "Required (≥5%)": round(required_throughput, 0),
-                    "Throughput OK?": "✅" if meets_tp else "❌",
+                    "Throughput OK?": "Yes" if meets_tp else "No",
                     "Avg WIP": avg_wip,
-                    "WIP Δ vs Base": f"{wip_delta_pct:+.1f}%",
-                    "WIP OK? (≤ Base)": "✅" if meets_wip else "❌",
+                    "WIP Δ vs Base": round(wip_delta_pct, 1),
+                    "WIP OK? (≤ Base)": "Yes" if meets_wip else "No",
                     "Lead Time": lead_time,
-                    "LT Δ vs Base": f"{lt_delta_pct:+.1f}%",
-                    "LT OK? (≤ Base)": "✅" if meets_lt else "❌",
-                    "Gate Status": "✅ PASSED" if gate_passed else "❌ REJECTED",
+                    "LT Δ vs Base": round(lt_delta_pct, 1),
+                    "LT OK? (≤ Base)": "Yes" if meets_lt else "No",
+                    "Gate Status": "PASSED" if gate_passed else "REJECTED",
                     "_gate_passed": gate_passed,
                     "_gain_pct": gain_pct,
                     "_avg_wip": avg_wip,
                     "_lead_time": lead_time,
                     "_num_changes": num_changes,
+                    "_meets_tp": meets_tp,
+                    "_meets_wip": meets_wip,
+                    "_meets_lt": meets_lt,
+                    "_tp": tp,
+                    "_required_tp": required_throughput,
+                    "_wip_delta_pct": wip_delta_pct,
+                    "_lt_delta_pct": lt_delta_pct,
                 })
 
             gate_df = pd.DataFrame(gate_rows)
             passed_df = gate_df[gate_df["_gate_passed"]].copy()
+
+            def pill(ok):
+                cls = "eval-pill-pass" if ok else "eval-pill-fail"
+                label = "✅ PASS" if ok else "❌ FAIL"
+                return f"<span class='eval-pill {cls}'>{label}</span>"
+
+            def metric_cell(value, delta_pct, ok):
+                cls = "eval-num-ok" if ok else "eval-num-fail"
+                arrow = "▼" if delta_pct <= 0 else "▲"
+                return f"{value:.2f} <span class='{cls}'>({arrow}{abs(delta_pct):.1f}%)</span>"
 
             # --- Summary metrics ---
             m1, m2, m3, m4 = st.columns(4)
@@ -817,8 +883,31 @@ with tab3:
             section_header("STAGE 1", "✔ Performance Gate — All Three Must Pass")
             st.caption("Throughput must reach the +5% target. Average WIP and Lead Time must NOT increase from the Base-Run. If any one fails, the scenario is Rejected — a strong throughput number cannot buy back excessive WIP or Lead Time.")
 
-            display_gate_df = gate_df.drop(columns=["_gate_passed", "_gain_pct", "_avg_wip", "_lead_time", "_num_changes"]).set_index("Scenario")
-            st.dataframe(display_gate_df, use_container_width=True)
+            gate_html_rows = []
+            for _, r in gate_df.iterrows():
+                gate_html_rows.append(f"""
+                <tr>
+                    <td class="scen-cell">{r['Scenario']}</td>
+                    <td>{r['Capacity Changes']}</td>
+                    <td>{r['# Changes']}</td>
+                    <td>{int(r['_tp'])} / {r['_required_tp']:.0f} req {pill(r['_meets_tp'])}</td>
+                    <td>{metric_cell(r['_avg_wip'], r['_wip_delta_pct'], r['_meets_wip'])} {pill(r['_meets_wip'])}</td>
+                    <td>{metric_cell(r['_lead_time'], r['_lt_delta_pct'], r['_meets_lt'])} {pill(r['_meets_lt'])}</td>
+                    <td>{pill(r['_gate_passed'])}</td>
+                </tr>""")
+
+            gate_html = f"""
+            <div class="eval-table-wrap">
+            <table class="eval-table">
+                <thead><tr>
+                    <th>Scenario</th><th>Capacity Changes</th><th># Changes</th>
+                    <th>Throughput (req)</th><th>Avg WIP (Δ)</th><th>Lead Time (Δ)</th><th>Gate</th>
+                </tr></thead>
+                <tbody>{''.join(gate_html_rows)}</tbody>
+            </table>
+            </div>
+            """
+            st.markdown(gate_html, unsafe_allow_html=True)
 
             st.markdown("<hr>", unsafe_allow_html=True)
             section_header("STAGE 2", "🏆 Ranking of Acceptable Scenarios")
@@ -836,10 +925,35 @@ with tab3:
                 medals = ["🥇", "🥈", "🥉"]
                 ranked_df["Rank"] = [medals[i] if i < 3 else f"#{i+1}" for i in range(len(ranked_df))]
 
+                rank_html_rows = []
+                for _, r in ranked_df.iterrows():
+                    rank_html_rows.append(f"""
+                    <tr>
+                        <td class="eval-medal">{r['Rank']}</td>
+                        <td class="scen-cell">{r['Scenario']}</td>
+                        <td>{int(r['Throughput'])}</td>
+                        <td>{r['Avg WIP']}</td>
+                        <td>{r['Lead Time']}</td>
+                        <td>{r['# Changes']}</td>
+                        <td>{r['Capacity Changes']}</td>
+                    </tr>""")
+
+                rank_html = f"""
+                <div class="eval-table-wrap">
+                <table class="eval-table">
+                    <thead><tr>
+                        <th>Rank</th><th>Scenario</th><th>Throughput</th><th>Avg WIP</th>
+                        <th>Lead Time</th><th># Changes</th><th>Capacity Changes</th>
+                    </tr></thead>
+                    <tbody>{''.join(rank_html_rows)}</tbody>
+                </table>
+                </div>
+                """
+                st.markdown(rank_html, unsafe_allow_html=True)
+
                 rank_display = ranked_df[[
                     "Rank", "Scenario", "Throughput", "Avg WIP", "Lead Time", "# Changes", "Capacity Changes"
                 ]].set_index("Rank")
-                st.dataframe(rank_display, use_container_width=True)
 
                 best = ranked_df.iloc[0]
                 st.success(
@@ -850,9 +964,14 @@ with tab3:
 
             st.markdown("---")
             st.subheader("📥 Export Performance Evaluation")
+            export_gate_df = gate_df[[
+                "Scenario", "Capacity Changes", "# Changes", "Throughput", "Required (≥5%)", "Throughput OK?",
+                "Avg WIP", "WIP Δ vs Base", "WIP OK? (≤ Base)", "Lead Time", "LT Δ vs Base", "LT OK? (≤ Base)",
+                "Gate Status"
+            ]].set_index("Scenario")
             opt_output = io.BytesIO()
             with pd.ExcelWriter(opt_output, engine='xlsxwriter') as writer:
-                display_gate_df.to_excel(writer, sheet_name='Performance Gate')
+                export_gate_df.to_excel(writer, sheet_name='Performance Gate')
                 if not passed_df.empty:
                     rank_display.to_excel(writer, sheet_name='Ranking')
             opt_excel_data = opt_output.getvalue()
