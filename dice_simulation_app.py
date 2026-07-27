@@ -791,18 +791,41 @@ with tab3:
                         # Quality tiers (⭐ labels) are ONLY ever awarded to scenarios that meet the
                         # 5% target. A failing scenario must never be able to out-rank a passing one
                         # by tier name, even if its raw Total Score happens to be numerically higher.
+                        tier_labels = {5: "⭐⭐⭐⭐⭐ Excellent", 4: "⭐⭐⭐⭐ Strong",
+                                       3: "⭐⭐⭐ Good", 2: "⭐⭐ Marginal", 1: "⭐ Weak"}
+
                         if total_score >= 85:
-                            tier = "⭐⭐⭐⭐⭐ Excellent"
+                            base_rank = 5
                         elif total_score >= 70:
-                            tier = "⭐⭐⭐⭐ Strong"
+                            base_rank = 4
                         elif total_score >= 55:
-                            tier = "⭐⭐⭐ Good"
+                            base_rank = 3
                         elif total_score >= 40:
-                            tier = "⭐⭐ Marginal"
+                            base_rank = 2
                         else:
-                            tier = "⭐ Weak"
+                            base_rank = 1
+
+                        # WIP Gate: hitting the throughput target by letting WIP/Lead Time balloon
+                        # must not be rewarded with a "Good"+ tier just because Throughput Score
+                        # is maxed out. Cap the tier using WIP Score on the same 5-point scale --
+                        # the WORSE of the two ranks wins.
+                        if wip_score >= 85:
+                            wip_cap_rank = 5
+                        elif wip_score >= 70:
+                            wip_cap_rank = 4
+                        elif wip_score >= 55:
+                            wip_cap_rank = 3
+                        elif wip_score >= 40:
+                            wip_cap_rank = 2
+                        else:
+                            wip_cap_rank = 1
+
+                        final_rank = min(base_rank, wip_cap_rank)
+                        tier = tier_labels[final_rank]
                         badge_class = "rec-gold"
                         recommendation = tier
+                        if wip_cap_rank < base_rank:
+                            recommendation += " ⚠️ capped — WIP/Lead Time rose"
                     else:
                         badge_class = "rec-fail"
                         recommendation = f"❌ Below Target (Score: {total_score:.1f}/100)"
@@ -885,6 +908,7 @@ with tab3:
 - **Capacity Score (0–100)**: `100 × (1 − Changes / Total Stations)`. Rewards touching fewer stations — 1 change out of 7 stations scores ~86, changing all 7 scores 0.
 - **WIP Score (0–100)**: centered at 50 = "WIP unchanged from base." `clamp(50 + %WIP reduction vs base, 0, 100)` — reducing average WIP earns bonus points above 50, increasing it costs points below 50.
 - **Tiers**: ⭐⭐⭐⭐⭐ ≥ 85 · ⭐⭐⭐⭐ ≥ 70 · ⭐⭐⭐ ≥ 55 · ⭐⭐ ≥ 40 · ⭐ below that. **Tiers are only ever assigned to scenarios that meet the 5% target** — a scenario that misses the target always shows as "Below Target (Score: X/100)" with no quality label, even if its raw Total Score is numerically high. This keeps a failing scenario from ever appearing to out-rank a passing one.
+- **WIP Gate**: a scenario's tier is also capped by its WIP Score on the same 5-point scale — whichever rank is worse (Total Score tier or WIP Score tier) wins. This stops a scenario from hitting the throughput target by letting WIP/Lead Time balloon and still walking away with a "Good" or better rating. When the gate kicks in, the row is marked **⚠️ capped — WIP/Lead Time rose**.
                 """)
 
 # --- TAB 4: METHODOLOGY ---
@@ -973,7 +997,10 @@ with tab4:
     st.markdown("""
     A scenario only counts as **meeting the target** once Gain % ≥ 5 — that flag is always shown
     alongside the Total Score, so a scenario can't disguise a missed target behind a decent Capacity
-    or WIP Score. Among scenarios that do meet the target, the Total Score ranks them: a scenario that
-    hits +6% with one targeted change and a leaner buffer will out-score one that hits +8% by widening
-    every station's dice range and stacking up WIP to get there.
+    or WIP Score. On top of that, a **WIP Gate** caps the star tier at whatever the WIP Score alone
+    would earn: a scenario can't hit the throughput target by letting WIP/Lead Time balloon and still
+    walk away with a "Good" or better rating just because Throughput Score maxed out. Among scenarios
+    that clear both the target and the WIP gate, the Total Score ranks them — a scenario that hits +6%
+    with one targeted change and a leaner buffer will out-score one that hits +8% by widening every
+    station's dice range and stacking up WIP to get there.
     """)
