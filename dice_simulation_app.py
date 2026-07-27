@@ -848,8 +848,14 @@ with tab3:
                     "_lt_delta_pct": lt_delta_pct,
                 })
 
-            gate_df = pd.DataFrame(gate_rows)
-            passed_df = gate_df[gate_df["_gate_passed"]].copy()
+            GATE_COLUMNS = [
+                "Scenario", "Capacity Changes", "# Changes", "Throughput", "Required (≥5%)", "Throughput OK?",
+                "Avg WIP", "WIP Δ vs Base", "WIP OK? (≤ Base)", "Lead Time", "LT Δ vs Base", "LT OK? (≤ Base)",
+                "Gate Status", "_gate_passed", "_gain_pct", "_avg_wip", "_lead_time", "_num_changes",
+                "_meets_tp", "_meets_wip", "_meets_lt", "_tp", "_required_tp", "_wip_delta_pct", "_lt_delta_pct",
+            ]
+            gate_df = pd.DataFrame(gate_rows, columns=GATE_COLUMNS)
+            passed_df = gate_df[gate_df["_gate_passed"] == True].copy() if not gate_df.empty else gate_df.copy()
 
             def pill(ok):
                 cls = "eval-pill-pass" if ok else "eval-pill-fail"
@@ -889,37 +895,43 @@ with tab3:
             section_header("STAGE 1", "✔ Performance Gate — All Three Must Pass")
             st.caption("Throughput must reach the +5% target. Average WIP and Lead Time must NOT increase from the Base-Run. If any one fails, the scenario is Rejected — a strong throughput number cannot buy back excessive WIP or Lead Time.")
 
-            gate_html_rows = []
-            for _, r in gate_df.iterrows():
-                gate_html_rows.append(f"""
-                <tr>
-                    <td class="scen-cell">{r['Scenario']}</td>
-                    <td>{r['Capacity Changes']}</td>
-                    <td>{r['# Changes']}</td>
-                    <td>{throughput_cell(int(r['_tp']), r['_gain_pct'], r['_meets_tp'])} {pill(r['_meets_tp'])}</td>
-                    <td>{metric_cell(r['_avg_wip'], r['_wip_delta_pct'], r['_meets_wip'])} {pill(r['_meets_wip'])}</td>
-                    <td>{metric_cell(r['_lead_time'], r['_lt_delta_pct'], r['_meets_lt'])} {pill(r['_meets_lt'])}</td>
-                    <td>{pill(r['_gate_passed'])}</td>
-                </tr>""")
+            if gate_df.empty:
+                st.info("Only a **Base-Run** has been recorded so far — there's nothing to evaluate yet. Adjust the capacity sliders in the sidebar and run at least one scenario to compare against the Base-Run.")
+            else:
+                gate_html_rows = []
+                for _, r in gate_df.iterrows():
+                    gate_html_rows.append(f"""
+                    <tr>
+                        <td class="scen-cell">{r['Scenario']}</td>
+                        <td>{r['Capacity Changes']}</td>
+                        <td>{r['# Changes']}</td>
+                        <td>{throughput_cell(int(r['_tp']), r['_gain_pct'], r['_meets_tp'])} {pill(r['_meets_tp'])}</td>
+                        <td>{metric_cell(r['_avg_wip'], r['_wip_delta_pct'], r['_meets_wip'])} {pill(r['_meets_wip'])}</td>
+                        <td>{metric_cell(r['_lead_time'], r['_lt_delta_pct'], r['_meets_lt'])} {pill(r['_meets_lt'])}</td>
+                        <td>{pill(r['_gate_passed'])}</td>
+                    </tr>""")
 
-            gate_html = f"""
-            <div class="eval-table-wrap">
-            <table class="eval-table">
-                <thead><tr>
-                    <th>Scenario</th><th>Capacity Changes</th><th># Changes</th>
-                    <th>Throughput (req)</th><th>Avg WIP (Δ)</th><th>Lead Time (Δ)</th><th>Gate</th>
-                </tr></thead>
-                <tbody>{''.join(gate_html_rows)}</tbody>
-            </table>
-            </div>
-            """
-            st.markdown(gate_html, unsafe_allow_html=True)
+                gate_html = f"""
+                <div class="eval-table-wrap">
+                <table class="eval-table">
+                    <thead><tr>
+                        <th>Scenario</th><th>Capacity Changes</th><th># Changes</th>
+                        <th>Throughput (req)</th><th>Avg WIP (Δ)</th><th>Lead Time (Δ)</th><th>Gate</th>
+                    </tr></thead>
+                    <tbody>{''.join(gate_html_rows)}</tbody>
+                </table>
+                </div>
+                """
+                st.markdown(gate_html, unsafe_allow_html=True)
 
             st.markdown("<hr>", unsafe_allow_html=True)
             section_header("STAGE 2", "🏆 Ranking of Acceptable Scenarios")
 
             if passed_df.empty:
-                st.warning("No scenario has passed the feasibility gate yet. A scenario must hit the +5% throughput target **and** keep Average WIP and Lead Time at or below the Base-Run to qualify for ranking.")
+                if gate_df.empty:
+                    st.warning("Nothing to rank yet — run at least one scenario against the Base-Run first.")
+                else:
+                    st.warning("No scenario has passed the feasibility gate yet. A scenario must hit the +5% throughput target **and** keep Average WIP and Lead Time at or below the Base-Run to qualify for ranking.")
             else:
                 st.caption("Ranked among scenarios that passed the gate only, in order: (1) highest throughput, (2) lowest Avg WIP, (3) lowest Lead Time, (4) fewest capacity changes.")
 
