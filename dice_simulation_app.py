@@ -594,7 +594,7 @@ if run_sim_clicked:
 tab1, tab2, tab3, tab4 = st.tabs([
     "🚀 Live Operations Console",
     "📊 Strategic Performance Analytics",
-    "🎯 Optimization Evaluation",
+    "🏭 Production Performance Evaluation",
     "📖 Methodology"
 ])
 
@@ -718,13 +718,14 @@ with tab2:
     else:
         st.info("No recorded history found for this User ID.")
 
-# --- TAB 3: OPTIMIZATION EVALUATION ---
+# --- TAB 3: PRODUCTION PERFORMANCE EVALUATION ---
 with tab3:
-    st.markdown("<h2 style='color:#1E3A8A; margin-top:10px;'>🎯 Optimization Evaluation</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#1E3A8A; margin-top:10px;'>🏭 Production System Performance Evaluation</h2>", unsafe_allow_html=True)
     st.write(
-        "Every scenario is scored against a single learning objective: **achieve at least a 5% increase "
-        "in throughput over the Base-Run while changing the fewest possible stations.** This turns the "
-        "exercise into a targeting problem — improving the right station(s), not every station."
+        "**Learning objective:** develop an operating policy that increases throughput by at least 5%, "
+        "while simultaneously **not increasing** average WIP or Lead Time, using the fewest possible "
+        "capacity changes. A scenario must clear a hard feasibility gate before it is even eligible to "
+        "be ranked — a single very good metric can never buy back a scenario that fails another."
     )
 
     if not user_record["history"]:
@@ -740,175 +741,148 @@ with tab3:
         else:
             base_row = base_rows.iloc[0]
             base_throughput = base_row["Throughput"]
+            base_avg_wip = base_row["Avg WIP (W_avg)"]
+            base_lead_time = base_row["Lead Time (L = Avg WIP / TR)"]
             base_ranges = stn_df[stn_df["Scenario"] == "Base-Run"].set_index("Station")["Dice Range"].to_dict()
 
             TARGET_GAIN_PCT = 5.0
-            TOTAL_STATIONS = len(members)
-            base_avg_wip = base_row["Avg WIP (W_avg)"]
+            required_throughput = base_throughput * (1 + TARGET_GAIN_PCT / 100)
 
-            def clamp(x, lo=0.0, hi=100.0):
-                return max(lo, min(hi, x))
-
-            eval_rows = []
+            gate_rows = []
             for _, row in hist_df.iterrows():
                 scen = row["Scenarios"]
+                if scen == "Base-Run":
+                    continue
                 tp = row["Throughput"]
                 avg_wip = row["Avg WIP (W_avg)"]
                 lead_time = row["Lead Time (L = Avg WIP / TR)"]
 
-                gain_pct = ((tp - base_throughput) / base_throughput * 100) if base_throughput > 0 else 0.0
-
                 scen_ranges = stn_df[stn_df["Scenario"] == scen].set_index("Station")["Dice Range"].to_dict()
-                changed_stations = sorted([s for s in scen_ranges if scen_ranges.get(s) != base_ranges.get(s)]) \
-                    if scen != "Base-Run" else []
+                changed_stations = sorted([s for s in scen_ranges if scen_ranges.get(s) != base_ranges.get(s)])
                 num_changes = len(changed_stations)
 
-                is_base = (scen == "Base-Run")
-                meets_target = (not is_base) and (gain_pct >= TARGET_GAIN_PCT)
+                gain_pct = ((tp - base_throughput) / base_throughput * 100) if base_throughput > 0 else 0.0
+                wip_delta_pct = ((avg_wip - base_avg_wip) / base_avg_wip * 100) if base_avg_wip > 0 else 0.0
+                lt_delta_pct = ((lead_time - base_lead_time) / base_lead_time * 100) if base_lead_time > 0 else 0.0
 
-                if is_base:
-                    tp_score = cap_score = wip_score = total_score = None
-                else:
-                    # Throughput Score (weight 50): 0 at no gain, 100 once the 5% target is reached.
-                    # No bonus past 100 -- overshooting the target isn't rewarded further.
-                    tp_score = clamp((gain_pct / TARGET_GAIN_PCT) * 100)
+                # --- STAGE 1: Mandatory feasibility gate. ALL three must pass. ---
+                meets_tp = tp >= required_throughput
+                meets_wip = avg_wip <= base_avg_wip
+                meets_lt = lead_time <= base_lead_time
+                gate_passed = meets_tp and meets_wip and meets_lt
 
-                    # Capacity Score (weight 30): % of stations left untouched. Fewer changes = higher score.
-                    cap_score = clamp(100 * (1 - num_changes / TOTAL_STATIONS))
-
-                    # WIP Score (weight 20): centered at 50 (= no change in WIP vs base).
-                    # Reducing avg WIP earns bonus points, increasing it costs points.
-                    wip_improvement_pct = ((base_avg_wip - avg_wip) / base_avg_wip * 100) if base_avg_wip > 0 else 0.0
-                    wip_score = clamp(50 + wip_improvement_pct)
-
-                    total_score = 0.5 * tp_score + 0.3 * cap_score + 0.2 * wip_score
-
-                if is_base:
-                    target_flag, badge_class, recommendation = "➖", "rec-base", "Baseline"
-                else:
-                    target_flag = "✅" if meets_target else "❌"
-                    if meets_target:
-                        # Quality tiers (⭐ labels) are ONLY ever awarded to scenarios that meet the
-                        # 5% target. A failing scenario must never be able to out-rank a passing one
-                        # by tier name, even if its raw Total Score happens to be numerically higher.
-                        tier_labels = {5: "⭐⭐⭐⭐⭐ Excellent", 4: "⭐⭐⭐⭐ Strong",
-                                       3: "⭐⭐⭐ Good", 2: "⭐⭐ Marginal", 1: "⭐ Weak"}
-
-                        if total_score >= 85:
-                            base_rank = 5
-                        elif total_score >= 70:
-                            base_rank = 4
-                        elif total_score >= 55:
-                            base_rank = 3
-                        elif total_score >= 40:
-                            base_rank = 2
-                        else:
-                            base_rank = 1
-
-                        # WIP Gate: hitting the throughput target by letting WIP/Lead Time balloon
-                        # must not be rewarded with a "Good"+ tier just because Throughput Score
-                        # is maxed out. Cap the tier using WIP Score on the same 5-point scale --
-                        # the WORSE of the two ranks wins.
-                        if wip_score >= 85:
-                            wip_cap_rank = 5
-                        elif wip_score >= 70:
-                            wip_cap_rank = 4
-                        elif wip_score >= 55:
-                            wip_cap_rank = 3
-                        elif wip_score >= 40:
-                            wip_cap_rank = 2
-                        else:
-                            wip_cap_rank = 1
-
-                        final_rank = min(base_rank, wip_cap_rank)
-                        tier = tier_labels[final_rank]
-                        badge_class = "rec-gold"
-                        recommendation = tier
-                        if wip_cap_rank < base_rank:
-                            recommendation += " ⚠️ capped — WIP/Lead Time rose"
-                    else:
-                        badge_class = "rec-fail"
-                        recommendation = f"❌ Below Target (Score: {total_score:.1f}/100)"
-
-                eval_rows.append({
+                gate_rows.append({
                     "Scenario": scen,
-                    "Capacity Changes": ", ".join(changed_stations) if changed_stations else ("—" if is_base else "None"),
+                    "Capacity Changes": ", ".join(changed_stations) if changed_stations else "None",
                     "# Changes": num_changes,
                     "Throughput": int(tp),
-                    "Gain vs Base (%)": round(gain_pct, 2),
-                    "Meets 5% Target?": target_flag,
+                    "Required (≥5%)": round(required_throughput, 0),
+                    "Throughput OK?": "✅" if meets_tp else "❌",
                     "Avg WIP": avg_wip,
+                    "WIP Δ vs Base": f"{wip_delta_pct:+.1f}%",
+                    "WIP OK? (≤ Base)": "✅" if meets_wip else "❌",
                     "Lead Time": lead_time,
-                    "Throughput Score (50%)": round(tp_score, 1) if tp_score is not None else "—",
-                    "Capacity Score (30%)": round(cap_score, 1) if cap_score is not None else "—",
-                    "WIP Score (20%)": round(wip_score, 1) if wip_score is not None else "—",
-                    "Total Score": round(total_score, 1) if total_score is not None else "—",
-                    "_badge_class": badge_class,
-                    "Recommendation": recommendation
+                    "LT Δ vs Base": f"{lt_delta_pct:+.1f}%",
+                    "LT OK? (≤ Base)": "✅" if meets_lt else "❌",
+                    "Gate Status": "✅ PASSED" if gate_passed else "❌ REJECTED",
+                    "_gate_passed": gate_passed,
+                    "_gain_pct": gain_pct,
+                    "_avg_wip": avg_wip,
+                    "_lead_time": lead_time,
+                    "_num_changes": num_changes,
                 })
 
-            eval_df = pd.DataFrame(eval_rows)
+            gate_df = pd.DataFrame(gate_rows)
+            passed_df = gate_df[gate_df["_gate_passed"]].copy()
 
             # --- Summary metrics ---
-            scored = eval_df[eval_df["Total Score"] != "—"].copy()
-            qualifying = eval_df[eval_df["Meets 5% Target?"] == "✅"].copy()
             m1, m2, m3, m4 = st.columns(4)
             with m1:
                 st.metric("Base Throughput", f"{int(base_throughput)} units")
             with m2:
-                st.metric("Scenarios Run", f"{len(eval_df) - 1}")
+                st.metric("Scenarios Run", f"{len(gate_df)}")
             with m3:
-                st.metric("Scenarios Meeting Target", f"{len(qualifying)}")
+                st.metric("Passed Gate", f"{len(passed_df)}")
             with m4:
-                if not scored.empty:
-                    best = scored.sort_values("Total Score", ascending=False).iloc[0]
-                    st.metric("Top-Scoring Scenario", f"{best['Scenario']} ({best['Total Score']})")
+                if not passed_df.empty:
+                    top = passed_df.sort_values(
+                        ["_gain_pct", "_avg_wip", "_lead_time", "_num_changes"],
+                        ascending=[False, True, True, True]
+                    ).iloc[0]
+                    st.metric("Top-Ranked Scenario", top["Scenario"])
                 else:
-                    st.metric("Top-Scoring Scenario", "—")
+                    st.metric("Top-Ranked Scenario", "—")
 
             st.markdown("<hr>", unsafe_allow_html=True)
-            st.subheader("Table D: Optimization Scorecard")
-            st.caption("Score = 50 × Throughput Score + 30 × Capacity Score + 20 × WIP Score  (each sub-score is 0–100, so Total Score is out of 100)")
+            section_header("STAGE 1", "✔ Performance Gate — All Three Must Pass")
+            st.caption("Throughput must reach the +5% target. Average WIP and Lead Time must NOT increase from the Base-Run. If any one fails, the scenario is Rejected — a strong throughput number cannot buy back excessive WIP or Lead Time.")
 
-            display_df = eval_df.drop(columns=["_badge_class"]).set_index("Scenario")
-            st.dataframe(display_df, use_container_width=True)
+            display_gate_df = gate_df.drop(columns=["_gate_passed", "_gain_pct", "_avg_wip", "_lead_time", "_num_changes"]).set_index("Scenario")
+            st.dataframe(display_gate_df, use_container_width=True)
 
-            if not qualifying.empty:
-                best = qualifying.sort_values("Total Score", ascending=False).iloc[0]
-                st.success(
-                    f"🏆 **{best['Scenario']}** has the best overall Score ({best['Total Score']}/100) among scenarios "
-                    f"meeting the target: **+{best['Gain vs Base (%)']}%** throughput with **{best['# Changes']}** "
-                    f"capacity change(s) ({best['Capacity Changes']}) and a WIP Score of {best['WIP Score (20%)']}."
-                )
+            st.markdown("<hr>", unsafe_allow_html=True)
+            section_header("STAGE 2", "🏆 Ranking of Acceptable Scenarios")
+
+            if passed_df.empty:
+                st.warning("No scenario has passed the feasibility gate yet. A scenario must hit the +5% throughput target **and** keep Average WIP and Lead Time at or below the Base-Run to qualify for ranking.")
             else:
-                st.warning("No scenario has reached the 5% throughput target yet. Try widening the dice range on the current bottleneck station rather than every station.")
+                st.caption("Ranked among scenarios that passed the gate only, in order: (1) highest throughput, (2) lowest Avg WIP, (3) lowest Lead Time, (4) fewest capacity changes.")
+
+                ranked_df = passed_df.sort_values(
+                    ["_gain_pct", "_avg_wip", "_lead_time", "_num_changes"],
+                    ascending=[False, True, True, True]
+                ).reset_index(drop=True)
+
+                medals = ["🥇", "🥈", "🥉"]
+                ranked_df["Rank"] = [medals[i] if i < 3 else f"#{i+1}" for i in range(len(ranked_df))]
+
+                rank_display = ranked_df[[
+                    "Rank", "Scenario", "Throughput", "Avg WIP", "Lead Time", "# Changes", "Capacity Changes"
+                ]].set_index("Rank")
+                st.dataframe(rank_display, use_container_width=True)
+
+                best = ranked_df.iloc[0]
+                st.success(
+                    f"🏆 **{best['Scenario']}** ranks best among feasible scenarios: **{int(best['Throughput'])}** units "
+                    f"throughput, Avg WIP **{best['Avg WIP']}**, Lead Time **{best['Lead Time']}**, achieved with "
+                    f"**{best['# Changes']}** capacity change(s) ({best['Capacity Changes']})."
+                )
 
             st.markdown("---")
-            st.subheader("📥 Export Optimization Scorecard")
+            st.subheader("📥 Export Performance Evaluation")
             opt_output = io.BytesIO()
             with pd.ExcelWriter(opt_output, engine='xlsxwriter') as writer:
-                display_df.to_excel(writer, sheet_name='Optimization Scorecard')
+                display_gate_df.to_excel(writer, sheet_name='Performance Gate')
+                if not passed_df.empty:
+                    rank_display.to_excel(writer, sheet_name='Ranking')
             opt_excel_data = opt_output.getvalue()
             st.download_button(
-                label="⬇️ Download Scorecard (Excel)",
+                label="⬇️ Download Evaluation (Excel)",
                 data=opt_excel_data,
-                file_name=f"Optimization_Scorecard_{current_user}.xlsx",
+                file_name=f"Performance_Evaluation_{current_user}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
 
-            with st.expander("📐 How the scorecard is calculated"):
-                st.markdown("""
-**Score = 50 × Throughput Score + 30 × Capacity Score + 20 × WIP Score** (Total Score out of 100)
+            with st.expander("📐 How this evaluation works"):
+                st.markdown(f"""
+**Stage 1 — Feasibility Gate (non-compensatory).** A scenario must satisfy **all** of the following to be considered acceptable at all. Failing even one condition rejects the scenario outright, regardless of how good the others look:
 
-- **Capacity Changes**: stations whose dice range in a scenario differs from that same station's range in the Base-Run.
-- **Gain vs Base (%)**: `(Scenario Throughput − Base Throughput) / Base Throughput × 100`.
-- **Meets 5% Target?**: ✅ if Gain vs Base ≥ 5% — shown regardless of Total Score, so a high-scoring scenario that hasn't hit the target is still clearly flagged.
-- **Throughput Score (0–100)**: `min(Gain% / 5%, 1) × 100`. Reaches 100 exactly at the 5% target; no extra credit for overshooting it.
-- **Capacity Score (0–100)**: `100 × (1 − Changes / Total Stations)`. Rewards touching fewer stations — 1 change out of 7 stations scores ~86, changing all 7 scores 0.
-- **WIP Score (0–100)**: centered at 50 = "WIP unchanged from base." `clamp(50 + %WIP reduction vs base, 0, 100)` — reducing average WIP earns bonus points above 50, increasing it costs points below 50.
-- **Tiers**: ⭐⭐⭐⭐⭐ ≥ 85 · ⭐⭐⭐⭐ ≥ 70 · ⭐⭐⭐ ≥ 55 · ⭐⭐ ≥ 40 · ⭐ below that. **Tiers are only ever assigned to scenarios that meet the 5% target** — a scenario that misses the target always shows as "Below Target (Score: X/100)" with no quality label, even if its raw Total Score is numerically high. This keeps a failing scenario from ever appearing to out-rank a passing one.
-- **WIP Gate**: a scenario's tier is also capped by its WIP Score on the same 5-point scale — whichever rank is worse (Total Score tier or WIP Score tier) wins. This stops a scenario from hitting the throughput target by letting WIP/Lead Time balloon and still walking away with a "Good" or better rating. When the gate kicks in, the row is marked **⚠️ capped — WIP/Lead Time rose**.
+| Criterion | Requirement |
+|---|---|
+| Throughput | ≥ {TARGET_GAIN_PCT:.0f}% increase over Base-Run (≥ {required_throughput:.0f} units) |
+| Average WIP | Must not increase from the Base-Run |
+| Lead Time | Must not increase from the Base-Run |
+
+This is deliberately **not a weighted average** — a scenario cannot compensate for a 100%+ WIP increase by over-delivering on throughput. That kind of trade-off hides congestion and bottlenecks rather than resolving them.
+
+**Stage 2 — Ranking (only among scenarios that passed Stage 1).** Ranked in strict priority order:
+1. Highest Throughput
+2. Lowest Average WIP
+3. Lowest Lead Time
+4. Fewest Capacity Changes
+
+Capacity Changes are tracked but are **not part of the gate** — "as few as possible" is a ranking tiebreaker among already-feasible solutions, not a pass/fail condition on its own.
                 """)
 
 # --- TAB 4: METHODOLOGY ---
@@ -964,43 +938,42 @@ with tab4:
 
     st.markdown("---")
 
-    meth_h2("🎯 Table D: Optimization Scorecard")
+    meth_h2("🏭 Table D: Production System Performance Evaluation")
     st.markdown("""
     The naive learning objective — *"maximize throughput"* — invites students to widen every station's dice
-    range at once. It works, but it doesn't teach anything about **where** constraints actually live.
+    range at once. It works, but it doesn't teach anything about **where** constraints actually live, and it
+    says nothing about what that throughput gain cost the system in inventory and delay.
     """)
     st.info("""
-    **The real objective:** reach at least a **5% throughput increase** over the Base-Run using the
-    **fewest capacity changes possible**, without inflating WIP inventory to get there. This forces
-    students to identify the binding constraint(s), resize only those, re-run, and check whether one
-    more change is actually worth it.
+    **The real objective:** develop an operating policy that increases throughput by at least **5%**, while
+    **not increasing** average WIP or Lead Time, using the **fewest possible capacity changes**. Evaluation
+    happens in two stages, and the stages are deliberately **not averaged together** — a scenario must
+    survive Stage 1 before Stage 2 even looks at it.
     """)
 
-    meth_h3("The Weighted Score")
-    st.latex(r"\text{Score} = 50 \times \text{Throughput Score} + 30 \times \text{Capacity Score} + 20 \times \text{WIP Score}")
-    st.markdown("Each sub-score is bounded 0–100, so the Total Score is out of 100. The weights reflect what matters most: hitting the throughput target (50%), doing it with minimal capacity changes (30%), and not bloating inventory to get there (20%).")
-
-    col_a, col_b, col_c = st.columns(3)
-    with col_a:
-        meth_h3("Throughput Score (50%)")
-        st.latex(r"\min\!\left(\frac{\text{Gain \%}}{5\%},\ 1\right) \times 100")
-        st.caption("Gain % = (Scenario TP − Base TP) / Base TP × 100. Reaches 100 exactly at the 5% target — no bonus for overshooting.")
-    with col_b:
-        meth_h3("Capacity Score (30%)")
-        st.latex(r"100 \times \left(1 - \frac{\text{Changes}}{\text{Total Stations}}\right)")
-        st.caption("Rewards touching fewer stations. 1 change out of 7 stations ≈ 86; changing all 7 stations = 0.")
-    with col_c:
-        meth_h3("WIP Score (20%)")
-        st.latex(r"\text{clamp}\big(50 + \%\Delta\text{WIP}_{\text{base}\to\text{scenario}},\ 0,\ 100\big)")
-        st.caption("Centered at 50 = WIP unchanged from base. Reducing WIP earns bonus points; increasing it costs points.")
-
+    meth_h3("Stage 1 — Feasibility Gate (non-compensatory)")
     st.markdown("""
-    A scenario only counts as **meeting the target** once Gain % ≥ 5 — that flag is always shown
-    alongside the Total Score, so a scenario can't disguise a missed target behind a decent Capacity
-    or WIP Score. On top of that, a **WIP Gate** caps the star tier at whatever the WIP Score alone
-    would earn: a scenario can't hit the throughput target by letting WIP/Lead Time balloon and still
-    walk away with a "Good" or better rating just because Throughput Score maxed out. Among scenarios
-    that clear both the target and the WIP gate, the Total Score ranks them — a scenario that hits +6%
-    with one targeted change and a leaner buffer will out-score one that hits +8% by widening every
-    station's dice range and stacking up WIP to get there.
+    A scenario must satisfy **all three** conditions below to be considered acceptable. Passing two out of
+    three is not a partial success — it's a rejection. A large throughput gain cannot buy back excessive WIP
+    or Lead Time, because in a real production line that "gain" is usually just work piling up in queues
+    rather than genuinely flowing through the system faster.
+    """)
+    st.latex(r"\text{Throughput}_{\text{scenario}} \geq 1.05 \times \text{Throughput}_{\text{base}}")
+    st.latex(r"\text{Avg WIP}_{\text{scenario}} \leq \text{Avg WIP}_{\text{base}}")
+    st.latex(r"\text{Lead Time}_{\text{scenario}} \leq \text{Lead Time}_{\text{base}}")
+    st.markdown("If **any one** of these fails, the scenario is marked **❌ REJECTED** regardless of how good the other two look.")
+
+    meth_h3("Stage 2 — Ranking (only among scenarios that passed Stage 1)")
+    st.markdown("""
+    Once a scenario clears the gate, it's ranked against the other acceptable scenarios in strict priority
+    order — each criterion only breaks ties left over by the one before it:
+    1. Highest Throughput
+    2. Lowest Average WIP
+    3. Lowest Lead Time
+    4. Fewest Capacity Changes
+
+    Capacity Changes deliberately sit **outside** the gate — "as few as possible" is how you break ties among
+    already-feasible solutions, not a condition a scenario can fail on its own. This mirrors how real
+    manufacturing improvement projects get evaluated: first confirm the change actually improves flow without
+    side effects, and only then compare competing solutions on efficiency and effort.
     """)
