@@ -253,6 +253,21 @@ st.markdown("""
     .eval-num-ok   { color: var(--success); font-weight: 700; }
     .eval-num-fail { color: var(--danger);  font-weight: 700; }
     .eval-medal { font-size: 1.1rem; }
+
+    .pei-pill {
+        display: inline-block;
+        padding: 0.18rem 0.6rem;
+        border-radius: 999px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.78rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .pei-excellent { background: #E4F5EC; color: #1F7A4D; border: 1px solid #1F7A4D; }
+    .pei-verygood  { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+    .pei-good      { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+    .pei-fair      { background: #FBEBDD; color: #B85C00; border: 1px solid #B85C00; }
+    .pei-needsimprovement { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -925,7 +940,7 @@ with tab3:
                 st.markdown(gate_html, unsafe_allow_html=True)
 
             st.markdown("<hr>", unsafe_allow_html=True)
-            section_header("STAGE 2", "🏆 Ranking of Acceptable Scenarios")
+            section_header("STAGE 2", "🏆 Efficiency Rating — Production Efficiency Index (PEI)")
 
             if passed_df.empty:
                 if gate_df.empty:
@@ -933,7 +948,11 @@ with tab3:
                 else:
                     st.warning("No scenario has passed the feasibility gate yet. A scenario must hit the +5% throughput target **and** keep Average WIP and Lead Time at or below the Base-Run to qualify for ranking.")
             else:
-                st.caption("Ranked among scenarios that passed the gate only, in order: (1) highest throughput, (2) lowest Avg WIP, (3) lowest Lead Time, (4) fewest capacity changes.")
+                st.caption(
+                    "Only scenarios that passed the gate are shown. Ranked by (1) highest throughput, (2) lowest Avg WIP, "
+                    "(3) lowest Lead Time, (4) fewest capacity changes. PEI = (Throughput Improvement% + WIP Reduction% + "
+                    "Lead Time Reduction%) / Capacity Changes — a single balanced measure of how efficiently the improvement was achieved."
+                )
 
                 ranked_df = passed_df.sort_values(
                     ["_gain_pct", "_avg_wip", "_lead_time", "_num_changes"],
@@ -943,6 +962,26 @@ with tab3:
                 medals = ["🥇", "🥈", "🥉"]
                 ranked_df["Rank"] = [medals[i] if i < 3 else f"#{i+1}" for i in range(len(ranked_df))]
 
+                # PEI: throughput improvement is _gain_pct (already positive, gate-enforced).
+                # WIP/Lead Time reduction is the negative of their delta vs base (gate-enforced <= 0),
+                # so -delta is a non-negative "reduction %". Divide by capacity changes (floor of 1
+                # to avoid divide-by-zero on the rare case of an unchanged-config scenario).
+                ranked_df["_pei"] = (
+                    ranked_df["_gain_pct"] + (-ranked_df["_wip_delta_pct"]) + (-ranked_df["_lt_delta_pct"])
+                ) / ranked_df["_num_changes"].clip(lower=1)
+
+                def pei_rating(pei):
+                    if pei >= 25:
+                        return "pei-excellent", "🟢 Excellent"
+                    elif pei >= 20:
+                        return "pei-verygood", "🟢 Very Good"
+                    elif pei >= 15:
+                        return "pei-good", "🟡 Good"
+                    elif pei >= 10:
+                        return "pei-fair", "🟠 Fair"
+                    else:
+                        return "pei-needsimprovement", "🔴 Needs Improvement"
+
                 def delta_span(pct, higher_is_better):
                     good = (pct >= 0) if higher_is_better else (pct <= 0)
                     cls = "eval-num-ok" if good else "eval-num-fail"
@@ -951,6 +990,7 @@ with tab3:
 
                 rank_html_rows = []
                 for _, r in ranked_df.iterrows():
+                    pei_cls, pei_label = pei_rating(r["_pei"])
                     rank_html_rows.append(f"""
                     <tr>
                         <td class="eval-medal">{r['Rank']}</td>
@@ -960,6 +1000,8 @@ with tab3:
                         <td>{r['Lead Time']} {delta_span(r['_lt_delta_pct'], False)}</td>
                         <td>{r['# Changes']}</td>
                         <td>{r['Capacity Changes']}</td>
+                        <td>{r['_pei']:.1f}</td>
+                        <td><span class="pei-pill {pei_cls}">{pei_label}</span></td>
                     </tr>""")
 
                 rank_html = f"""
@@ -968,6 +1010,7 @@ with tab3:
                     <thead><tr>
                         <th>Rank</th><th>Scenario</th><th>Throughput (Δ vs Base)</th><th>Avg WIP (Δ vs Base)</th>
                         <th>Lead Time (Δ vs Base)</th><th># Changes</th><th>Capacity Changes</th>
+                        <th>PEI</th><th>Rating</th>
                     </tr></thead>
                     <tbody>{''.join(rank_html_rows)}</tbody>
                 </table>
@@ -976,16 +1019,17 @@ with tab3:
                 st.markdown(rank_html, unsafe_allow_html=True)
 
                 rank_display = ranked_df[[
-                    "Rank", "Scenario", "Throughput", "Avg WIP", "Lead Time", "# Changes", "Capacity Changes"
-                ]].set_index("Rank")
+                    "Rank", "Scenario", "Throughput", "Avg WIP", "Lead Time", "# Changes", "Capacity Changes", "_pei"
+                ]].rename(columns={"_pei": "PEI"}).set_index("Rank")
 
                 best = ranked_df.iloc[0]
+                best_pei_cls, best_pei_label = pei_rating(best["_pei"])
                 st.success(
                     f"🏆 **{best['Scenario']}** ranks best among feasible scenarios: **{int(best['Throughput'])}** units "
                     f"throughput (**+{best['_gain_pct']:.1f}%** vs base), Avg WIP **{best['Avg WIP']}** "
                     f"(**{best['_wip_delta_pct']:+.1f}%** vs base), Lead Time **{best['Lead Time']}** "
                     f"(**{best['_lt_delta_pct']:+.1f}%** vs base), achieved with **{best['# Changes']}** "
-                    f"capacity change(s) ({best['Capacity Changes']})."
+                    f"capacity change(s) ({best['Capacity Changes']}) — PEI **{best['_pei']:.1f}** ({best_pei_label})."
                 )
 
             st.markdown("---")
@@ -1021,13 +1065,23 @@ with tab3:
 
 This is deliberately **not a weighted average** — a scenario cannot compensate for a 100%+ WIP increase by over-delivering on throughput. That kind of trade-off hides congestion and bottlenecks rather than resolving them.
 
-**Stage 2 — Ranking (only among scenarios that passed Stage 1).** Ranked in strict priority order:
-1. Highest Throughput
-2. Lowest Average WIP
-3. Lowest Lead Time
-4. Fewest Capacity Changes
+**Stage 2 — Ranking + Efficiency Rating (only among scenarios that passed Stage 1).**
 
-Capacity Changes are tracked but are **not part of the gate** — "as few as possible" is a ranking tiebreaker among already-feasible solutions, not a pass/fail condition on its own.
+Scenarios are ordered in strict priority: (1) Highest Throughput, (2) Lowest Average WIP, (3) Lowest Lead Time, (4) Fewest Capacity Changes. Capacity Changes are tracked but sit **outside** the gate — "as few as possible" is a tiebreaker among already-feasible solutions, not a pass/fail condition on its own.
+
+Alongside the rank, each scenario also gets a **Production Efficiency Index (PEI)** — a single balanced score of how much *overall* system improvement was squeezed out of each capacity change, so a scenario can't look good just by tuning one KPI hard while dragging the others:
+
+`PEI = (Throughput Improvement % + WIP Reduction % + Lead Time Reduction %) / Capacity Changes`
+
+| PEI | Rating |
+|---:|---|
+| ≥ 25 | 🟢 Excellent |
+| 20 – 24.99 | 🟢 Very Good |
+| 15 – 19.99 | 🟡 Good |
+| 10 – 14.99 | 🟠 Fair |
+| < 10 | 🔴 Needs Improvement |
+
+PEI is only ever computed for scenarios that already passed the Stage 1 gate — a scenario with worse WIP or Lead Time than base is **Rejected** before PEI even enters the picture, it never gets a rating at all.
                 """)
 
 # --- TAB 4: METHODOLOGY ---
@@ -1108,7 +1162,7 @@ with tab4:
     st.latex(r"\text{Lead Time}_{\text{scenario}} \leq \text{Lead Time}_{\text{base}}")
     st.markdown("If **any one** of these fails, the scenario is marked **❌ REJECTED** regardless of how good the other two look.")
 
-    meth_h3("Stage 2 — Ranking (only among scenarios that passed Stage 1)")
+    meth_h3("Stage 2 — Ranking + Efficiency Rating (only among scenarios that passed Stage 1)")
     st.markdown("""
     Once a scenario clears the gate, it's ranked against the other acceptable scenarios in strict priority
     order — each criterion only breaks ties left over by the one before it:
@@ -1122,3 +1176,40 @@ with tab4:
     manufacturing improvement projects get evaluated: first confirm the change actually improves flow without
     side effects, and only then compare competing solutions on efficiency and effort.
     """)
+
+    st.info("""
+    **Why not rank by throughput-per-capacity-change alone?** A single-KPI efficiency ratio can be misleading:
+    a scenario that only nudges throughput but slashes WIP and Lead Time with one lucky change can out-score
+    a scenario that delivers real, balanced improvement across all three — even though the second is
+    operationally the better outcome. The Production Efficiency Index below fixes this by crediting all three
+    KPIs together, not just throughput.
+    """)
+
+    st.latex(r"\text{PEI} = \frac{\text{Throughput Improvement \%} + \text{WIP Reduction \%} + \text{Lead Time Reduction \%}}{\text{Capacity Changes}}")
+    st.markdown("""
+    All three terms are measured relative to the Base-Run, and PEI is only ever calculated for scenarios that
+    already passed the Stage 1 gate — so WIP Reduction % and Lead Time Reduction % are guaranteed non-negative
+    by the time PEI sees them. A scenario that fails the gate gets **no PEI at all**; it's Rejected before
+    scoring is even relevant.
+    """)
+
+    rating_col1, rating_col2 = st.columns([1, 1])
+    with rating_col1:
+        st.markdown("""
+| PEI | Rating |
+|---:|---|
+| ≥ 25 | 🟢 Excellent |
+| 20 – 24.99 | 🟢 Very Good |
+| 15 – 19.99 | 🟡 Good |
+| 10 – 14.99 | 🟠 Fair |
+| < 10 | 🔴 Needs Improvement |
+        """)
+    with rating_col2:
+        st.markdown("""
+**Worked example** — Scenario with Throughput +6.1%, WIP −93.1%, Lead Time −93.5%, achieved with 6 capacity changes:
+
+PEI = (6.1 + 93.1 + 93.5) / 6 ≈ **32.1** → 🟢 Excellent
+
+A scenario that only reaches +1.4% throughput while WIP and Lead Time both got *worse* than base never reaches
+this stage — it's Rejected at the gate, regardless of how few capacity changes it used.
+        """)
