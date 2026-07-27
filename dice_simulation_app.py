@@ -861,6 +861,12 @@ with tab3:
                 arrow = "▼" if delta_pct <= 0 else "▲"
                 return f"{value:.2f} <span class='{cls}'>({arrow}{abs(delta_pct):.1f}%)</span>"
 
+            def throughput_cell(value, gain_pct, ok):
+                cls = "eval-num-ok" if ok else "eval-num-fail"
+                arrow = "▼" if gain_pct <= 0 else "▲"
+                return (f"{value} <span class='{cls}'>({arrow}{abs(gain_pct):.1f}%)</span>"
+                        f"<br><span style='color:var(--muted); font-size:0.78rem;'>need ≥ +5.0%</span>")
+
             # --- Summary metrics ---
             m1, m2, m3, m4 = st.columns(4)
             with m1:
@@ -890,7 +896,7 @@ with tab3:
                     <td class="scen-cell">{r['Scenario']}</td>
                     <td>{r['Capacity Changes']}</td>
                     <td>{r['# Changes']}</td>
-                    <td>{int(r['_tp'])} / {r['_required_tp']:.0f} req {pill(r['_meets_tp'])}</td>
+                    <td>{throughput_cell(int(r['_tp']), r['_gain_pct'], r['_meets_tp'])} {pill(r['_meets_tp'])}</td>
                     <td>{metric_cell(r['_avg_wip'], r['_wip_delta_pct'], r['_meets_wip'])} {pill(r['_meets_wip'])}</td>
                     <td>{metric_cell(r['_lead_time'], r['_lt_delta_pct'], r['_meets_lt'])} {pill(r['_meets_lt'])}</td>
                     <td>{pill(r['_gate_passed'])}</td>
@@ -925,15 +931,21 @@ with tab3:
                 medals = ["🥇", "🥈", "🥉"]
                 ranked_df["Rank"] = [medals[i] if i < 3 else f"#{i+1}" for i in range(len(ranked_df))]
 
+                def delta_span(pct, higher_is_better):
+                    good = (pct >= 0) if higher_is_better else (pct <= 0)
+                    cls = "eval-num-ok" if good else "eval-num-fail"
+                    arrow = "▲" if pct >= 0 else "▼"
+                    return f"<span class='{cls}'>({arrow}{abs(pct):.1f}%)</span>"
+
                 rank_html_rows = []
                 for _, r in ranked_df.iterrows():
                     rank_html_rows.append(f"""
                     <tr>
                         <td class="eval-medal">{r['Rank']}</td>
                         <td class="scen-cell">{r['Scenario']}</td>
-                        <td>{int(r['Throughput'])}</td>
-                        <td>{r['Avg WIP']}</td>
-                        <td>{r['Lead Time']}</td>
+                        <td>{int(r['Throughput'])} {delta_span(r['_gain_pct'], True)}</td>
+                        <td>{r['Avg WIP']} {delta_span(r['_wip_delta_pct'], False)}</td>
+                        <td>{r['Lead Time']} {delta_span(r['_lt_delta_pct'], False)}</td>
                         <td>{r['# Changes']}</td>
                         <td>{r['Capacity Changes']}</td>
                     </tr>""")
@@ -942,8 +954,8 @@ with tab3:
                 <div class="eval-table-wrap">
                 <table class="eval-table">
                     <thead><tr>
-                        <th>Rank</th><th>Scenario</th><th>Throughput</th><th>Avg WIP</th>
-                        <th>Lead Time</th><th># Changes</th><th>Capacity Changes</th>
+                        <th>Rank</th><th>Scenario</th><th>Throughput (Δ vs Base)</th><th>Avg WIP (Δ vs Base)</th>
+                        <th>Lead Time (Δ vs Base)</th><th># Changes</th><th>Capacity Changes</th>
                     </tr></thead>
                     <tbody>{''.join(rank_html_rows)}</tbody>
                 </table>
@@ -958,8 +970,10 @@ with tab3:
                 best = ranked_df.iloc[0]
                 st.success(
                     f"🏆 **{best['Scenario']}** ranks best among feasible scenarios: **{int(best['Throughput'])}** units "
-                    f"throughput, Avg WIP **{best['Avg WIP']}**, Lead Time **{best['Lead Time']}**, achieved with "
-                    f"**{best['# Changes']}** capacity change(s) ({best['Capacity Changes']})."
+                    f"throughput (**+{best['_gain_pct']:.1f}%** vs base), Avg WIP **{best['Avg WIP']}** "
+                    f"(**{best['_wip_delta_pct']:+.1f}%** vs base), Lead Time **{best['Lead Time']}** "
+                    f"(**{best['_lt_delta_pct']:+.1f}%** vs base), achieved with **{best['# Changes']}** "
+                    f"capacity change(s) ({best['Capacity Changes']})."
                 )
 
             st.markdown("---")
