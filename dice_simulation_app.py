@@ -788,8 +788,10 @@ with tab3:
     st.write(
         "**Learning objective:** develop an operating policy that increases throughput by at least 5%, "
         "while simultaneously **not increasing** average WIP or Lead Time, using the fewest possible "
-        "capacity changes. A scenario must clear a hard feasibility gate before it is even eligible to "
-        "be ranked — a single very good metric can never buy back a scenario that fails another."
+        "capacity changes. This isn't scored by a single formula — manufacturing optimization is a "
+        "multi-objective problem, so it's evaluated in stages: a hard feasibility gate first (Stage 1), "
+        "then a rating of how economically the improvement was achieved (Stages 2–3), plus a Best "
+        "Optimization Award for the most efficient winning strategy overall."
     )
 
     if not user_record["history"]:
@@ -812,6 +814,20 @@ with tab3:
             TARGET_GAIN_PCT = 5.0
             required_throughput = base_throughput * (1 + TARGET_GAIN_PCT / 100)
 
+            with st.expander("⚙️ Optional: Improvement Budget"):
+                st.caption(
+                    "In real manufacturing, managers can't upgrade every station — resources are limited. "
+                    "Set a budget on how many stations can be modified, and optionally enforce it as part of the gate."
+                )
+                budget_col1, budget_col2 = st.columns([2, 1])
+                with budget_col1:
+                    improvement_budget = st.number_input(
+                        "Improvement Budget (max capacity changes allowed)",
+                        min_value=1, max_value=len(members), value=min(4, len(members)), step=1
+                    )
+                with budget_col2:
+                    enforce_budget = st.checkbox("Enforce as part of gate", value=False)
+
             gate_rows = []
             for _, row in hist_df.iterrows():
                 scen = row["Scenarios"]
@@ -831,9 +847,10 @@ with tab3:
 
                 # --- STAGE 1: Mandatory feasibility gate. ALL three must pass. ---
                 meets_tp = tp >= required_throughput
-                meets_wip = avg_wip <= base_avg_wip
-                meets_lt = lead_time <= base_lead_time
-                gate_passed = meets_tp and meets_wip and meets_lt
+                meets_wip = avg_wip < base_avg_wip
+                meets_lt = lead_time < base_lead_time
+                within_budget = num_changes <= improvement_budget
+                gate_passed = meets_tp and meets_wip and meets_lt and (within_budget if enforce_budget else True)
 
                 gate_rows.append({
                     "Scenario": scen,
@@ -844,10 +861,11 @@ with tab3:
                     "Throughput OK?": "Yes" if meets_tp else "No",
                     "Avg WIP": avg_wip,
                     "WIP Δ vs Base": round(wip_delta_pct, 1),
-                    "WIP OK? (≤ Base)": "Yes" if meets_wip else "No",
+                    "WIP OK? (< Base)": "Yes" if meets_wip else "No",
                     "Lead Time": lead_time,
                     "LT Δ vs Base": round(lt_delta_pct, 1),
-                    "LT OK? (≤ Base)": "Yes" if meets_lt else "No",
+                    "LT OK? (< Base)": "Yes" if meets_lt else "No",
+                    "Within Budget?": "Yes" if within_budget else "No",
                     "Gate Status": "PASSED" if gate_passed else "REJECTED",
                     "_gate_passed": gate_passed,
                     "_gain_pct": gain_pct,
@@ -857,6 +875,7 @@ with tab3:
                     "_meets_tp": meets_tp,
                     "_meets_wip": meets_wip,
                     "_meets_lt": meets_lt,
+                    "_within_budget": within_budget,
                     "_tp": tp,
                     "_required_tp": required_throughput,
                     "_wip_delta_pct": wip_delta_pct,
@@ -865,9 +884,9 @@ with tab3:
 
             GATE_COLUMNS = [
                 "Scenario", "Capacity Changes", "# Changes", "Throughput", "Required (≥5%)", "Throughput OK?",
-                "Avg WIP", "WIP Δ vs Base", "WIP OK? (≤ Base)", "Lead Time", "LT Δ vs Base", "LT OK? (≤ Base)",
-                "Gate Status", "_gate_passed", "_gain_pct", "_avg_wip", "_lead_time", "_num_changes",
-                "_meets_tp", "_meets_wip", "_meets_lt", "_tp", "_required_tp", "_wip_delta_pct", "_lt_delta_pct",
+                "Avg WIP", "WIP Δ vs Base", "WIP OK? (< Base)", "Lead Time", "LT Δ vs Base", "LT OK? (< Base)",
+                "Within Budget?", "Gate Status", "_gate_passed", "_gain_pct", "_avg_wip", "_lead_time", "_num_changes",
+                "_meets_tp", "_meets_wip", "_meets_lt", "_within_budget", "_tp", "_required_tp", "_wip_delta_pct", "_lt_delta_pct",
             ]
             gate_df = pd.DataFrame(gate_rows, columns=GATE_COLUMNS)
             passed_df = gate_df[gate_df["_gate_passed"] == True].copy() if not gate_df.empty else gate_df.copy()
@@ -908,18 +927,22 @@ with tab3:
 
             st.markdown("<hr>", unsafe_allow_html=True)
             section_header("STAGE 1", "✔ Performance Gate — All Three Must Pass")
-            st.caption("Throughput must reach the +5% target. Average WIP and Lead Time must NOT increase from the Base-Run. If any one fails, the scenario is Rejected — a strong throughput number cannot buy back excessive WIP or Lead Time.")
+            gate_caption = "Throughput must reach the +5% target. Average WIP and Lead Time must be LOWER than the Base-Run. If any one fails, the scenario is Rejected — a strong throughput number cannot buy back excessive WIP or Lead Time."
+            if enforce_budget:
+                gate_caption += f" Capacity Changes must also stay within the {improvement_budget}-point Improvement Budget."
+            st.caption(gate_caption)
 
             if gate_df.empty:
                 st.info("Only a **Base-Run** has been recorded so far — there's nothing to evaluate yet. Adjust the capacity sliders in the sidebar and run at least one scenario to compare against the Base-Run.")
             else:
                 gate_html_rows = []
                 for _, r in gate_df.iterrows():
+                    budget_cell = f" · {pill(r['_within_budget'])} budget" if enforce_budget else f" <span style='color:var(--muted); font-size:0.78rem;'>({int(r['_num_changes'])}/{improvement_budget} budget)</span>"
                     gate_html_rows.append(f"""
                     <tr>
                         <td class="scen-cell">{r['Scenario']}</td>
                         <td>{r['Capacity Changes']}</td>
-                        <td>{r['# Changes']}</td>
+                        <td>{r['# Changes']}{budget_cell}</td>
                         <td>{throughput_cell(int(r['_tp']), r['_gain_pct'], r['_meets_tp'])} {pill(r['_meets_tp'])}</td>
                         <td>{metric_cell(r['_avg_wip'], r['_wip_delta_pct'], r['_meets_wip'])} {pill(r['_meets_wip'])}</td>
                         <td>{metric_cell(r['_lead_time'], r['_lt_delta_pct'], r['_meets_lt'])} {pill(r['_meets_lt'])}</td>
@@ -939,111 +962,143 @@ with tab3:
                 """
                 st.markdown(gate_html, unsafe_allow_html=True)
 
+
             st.markdown("<hr>", unsafe_allow_html=True)
-            section_header("STAGE 2", "🏆 Efficiency Rating — Production Efficiency Index (PEI)")
+            section_header("STAGE 2", "⚙️ Optimization Strategy — Capacity Change Rating")
+            st.caption("Only scenarios that passed the gate are rated here. Rated purely on how many stations were touched — fewer changes means a more targeted, more economical improvement strategy.")
 
-            if passed_df.empty:
-                if gate_df.empty:
-                    st.warning("Nothing to rank yet — run at least one scenario against the Base-Run first.")
+            def capacity_tier(num_changes):
+                if num_changes <= 2:
+                    return "pei-excellent", "⭐ Excellent"
+                elif num_changes <= 4:
+                    return "pei-verygood", "✅ Very Good"
+                elif num_changes == 5:
+                    return "pei-good", "🟡 Good"
+                elif num_changes == 6:
+                    return "pei-fair", "🟠 Fair"
                 else:
-                    st.warning("No scenario has passed the feasibility gate yet. A scenario must hit the +5% throughput target **and** keep Average WIP and Lead Time at or below the Base-Run to qualify for ranking.")
+                    return "pei-needsimprovement", "❌ Poor"
+
+            FEEDBACK_TEXT = {
+                "Excellent": "The operational target was achieved with minimal capacity modifications. The solution demonstrates effective bottleneck identification and efficient resource utilization.",
+                "Very Good": "The operational target was achieved with a reasonable number of capacity changes. Consider whether one or more modifications can be eliminated while maintaining similar performance.",
+                "Good": "The operational target was achieved; however, the solution required modifications to several stations. Further optimization should focus on reducing implementation effort.",
+                "Fair": "Although the operational target was achieved, improvements were obtained through extensive capacity modifications. This approach is effective but may not be economically practical.",
+                "Poor": "The operational target was achieved, but the solution relied on capacity increases across nearly every station. This indicates limited bottleneck analysis and is unlikely to be economically viable in practice.",
+                "Not Acceptable": "The scenario failed to satisfy one or more mandatory operational criteria. Review the bottleneck analysis and develop a more balanced improvement strategy.",
+            }
+
+            if gate_df.empty:
+                st.info("Nothing to rate yet — run at least one scenario against the Base-Run first.")
             else:
-                st.caption(
-                    "Only scenarios that passed the gate are shown. Ranked by (1) highest throughput, (2) lowest Avg WIP, "
-                    "(3) lowest Lead Time, (4) fewest capacity changes. PEI = (Throughput Improvement% + WIP Reduction% + "
-                    "Lead Time Reduction%) / Capacity Changes — a single balanced measure of how efficiently the improvement was achieved."
-                )
-
-                ranked_df = passed_df.sort_values(
-                    ["_gain_pct", "_avg_wip", "_lead_time", "_num_changes"],
-                    ascending=[False, True, True, True]
-                ).reset_index(drop=True)
-
-                medals = ["🥇", "🥈", "🥉"]
-                ranked_df["Rank"] = [medals[i] if i < 3 else f"#{i+1}" for i in range(len(ranked_df))]
-
-                # PEI: throughput improvement is _gain_pct (already positive, gate-enforced).
-                # WIP/Lead Time reduction is the negative of their delta vs base (gate-enforced <= 0),
-                # so -delta is a non-negative "reduction %". Divide by capacity changes (floor of 1
-                # to avoid divide-by-zero on the rare case of an unchanged-config scenario).
-                ranked_df["_pei"] = (
-                    ranked_df["_gain_pct"] + (-ranked_df["_wip_delta_pct"]) + (-ranked_df["_lt_delta_pct"])
-                ) / ranked_df["_num_changes"].clip(lower=1)
-
-                def pei_rating(pei):
-                    if pei >= 25:
-                        return "pei-excellent", "🟢 Excellent"
-                    elif pei >= 20:
-                        return "pei-verygood", "🟢 Very Good"
-                    elif pei >= 15:
-                        return "pei-good", "🟡 Good"
-                    elif pei >= 10:
-                        return "pei-fair", "🟠 Fair"
+                strategy_html_rows = []
+                for _, r in gate_df.iterrows():
+                    if r["_gate_passed"]:
+                        cls, label = capacity_tier(r["_num_changes"])
                     else:
-                        return "pei-needsimprovement", "🔴 Needs Improvement"
-
-                def delta_span(pct, higher_is_better):
-                    good = (pct >= 0) if higher_is_better else (pct <= 0)
-                    cls = "eval-num-ok" if good else "eval-num-fail"
-                    arrow = "▲" if pct >= 0 else "▼"
-                    return f"<span class='{cls}'>({arrow}{abs(pct):.1f}%)</span>"
-
-                rank_html_rows = []
-                for _, r in ranked_df.iterrows():
-                    pei_cls, pei_label = pei_rating(r["_pei"])
-                    rank_html_rows.append(f"""
+                        cls, label = "rec-fail", "— Not Acceptable"
+                    strategy_html_rows.append(f"""
                     <tr>
-                        <td class="eval-medal">{r['Rank']}</td>
                         <td class="scen-cell">{r['Scenario']}</td>
-                        <td>{int(r['Throughput'])} {delta_span(r['_gain_pct'], True)}</td>
-                        <td>{r['Avg WIP']} {delta_span(r['_wip_delta_pct'], False)}</td>
-                        <td>{r['Lead Time']} {delta_span(r['_lt_delta_pct'], False)}</td>
+                        <td>{pill(r['_gate_passed'])}</td>
                         <td>{r['# Changes']}</td>
-                        <td>{r['Capacity Changes']}</td>
-                        <td>{r['_pei']:.1f}</td>
-                        <td><span class="pei-pill {pei_cls}">{pei_label}</span></td>
+                        <td><span class="pei-pill {cls}">{label}</span></td>
                     </tr>""")
 
-                rank_html = f"""
+                strategy_html = f"""
                 <div class="eval-table-wrap">
                 <table class="eval-table">
                     <thead><tr>
-                        <th>Rank</th><th>Scenario</th><th>Throughput (Δ vs Base)</th><th>Avg WIP (Δ vs Base)</th>
-                        <th>Lead Time (Δ vs Base)</th><th># Changes</th><th>Capacity Changes</th>
-                        <th>PEI</th><th>Rating</th>
+                        <th>Scenario</th><th>Gate</th><th># Changes</th><th>Optimization Strategy Rating</th>
                     </tr></thead>
-                    <tbody>{''.join(rank_html_rows)}</tbody>
+                    <tbody>{''.join(strategy_html_rows)}</tbody>
                 </table>
                 </div>
                 """
-                st.markdown(rank_html, unsafe_allow_html=True)
+                st.markdown(strategy_html, unsafe_allow_html=True)
 
-                rank_display = ranked_df[[
-                    "Rank", "Scenario", "Throughput", "Avg WIP", "Lead Time", "# Changes", "Capacity Changes", "_pei"
-                ]].rename(columns={"_pei": "PEI"}).set_index("Rank")
+            st.markdown("<hr>", unsafe_allow_html=True)
+            section_header("STAGE 3", "🎓 Overall Performance Rating + Feedback")
+            st.caption("Combines Stage 1 (must pass) with Stage 2 (capacity efficiency) into one overall rating, plus automatically generated feedback for each scenario.")
 
-                best = ranked_df.iloc[0]
-                best_pei_cls, best_pei_label = pei_rating(best["_pei"])
+            if gate_df.empty:
+                st.info("Nothing to evaluate yet — run at least one scenario against the Base-Run first.")
+            else:
+                overall_html_rows = []
+                for _, r in gate_df.iterrows():
+                    if r["_gate_passed"]:
+                        cls, label = capacity_tier(r["_num_changes"])
+                        rating_key = label.split(" ", 1)[1]  # strip emoji
+                    else:
+                        cls, label = "rec-fail", "❌ Not Acceptable"
+                        rating_key = "Not Acceptable"
+                    feedback = FEEDBACK_TEXT.get(rating_key, "")
+                    overall_html_rows.append(f"""
+                    <tr>
+                        <td class="scen-cell">{r['Scenario']}</td>
+                        <td><span class="pei-pill {cls}">{label}</span></td>
+                        <td style="white-space:normal; max-width:420px;">{feedback}</td>
+                    </tr>""")
+
+                overall_html = f"""
+                <div class="eval-table-wrap">
+                <table class="eval-table">
+                    <thead><tr>
+                        <th>Scenario</th><th>Overall Rating</th><th>Feedback</th>
+                    </tr></thead>
+                    <tbody>{''.join(overall_html_rows)}</tbody>
+                </table>
+                </div>
+                """
+                st.markdown(overall_html, unsafe_allow_html=True)
+
+            st.markdown("<hr>", unsafe_allow_html=True)
+            section_header("BONUS", "🏆 Best Optimization Award")
+
+            if passed_df.empty:
+                if gate_df.empty:
+                    st.warning("Nothing to award yet — run at least one scenario against the Base-Run first.")
+                else:
+                    st.warning("No scenario has passed the feasibility gate yet — the award only goes to scenarios that clear Stage 1.")
+            else:
+                st.caption("Among scenarios that passed the gate: ranked by (1) fewest capacity changes, (2) highest throughput, (3) lowest Avg WIP, (4) lowest Lead Time.")
+
+                award_df = passed_df.sort_values(
+                    ["_num_changes", "_gain_pct", "_avg_wip", "_lead_time"],
+                    ascending=[True, False, True, True]
+                ).reset_index(drop=True)
+
+                winner = award_df.iloc[0]
                 st.success(
-                    f"🏆 **{best['Scenario']}** ranks best among feasible scenarios: **{int(best['Throughput'])}** units "
-                    f"throughput (**+{best['_gain_pct']:.1f}%** vs base), Avg WIP **{best['Avg WIP']}** "
-                    f"(**{best['_wip_delta_pct']:+.1f}%** vs base), Lead Time **{best['Lead Time']}** "
-                    f"(**{best['_lt_delta_pct']:+.1f}%** vs base), achieved with **{best['# Changes']}** "
-                    f"capacity change(s) ({best['Capacity Changes']}) — PEI **{best['_pei']:.1f}** ({best_pei_label})."
+                    f"🏆 **{winner['Scenario']}** wins the Best Optimization Award: just **{winner['# Changes']}** "
+                    f"capacity change(s) ({winner['Capacity Changes']}), **+{winner['_gain_pct']:.1f}%** throughput, "
+                    f"Avg WIP **{winner['Avg WIP']}** ({winner['_wip_delta_pct']:+.1f}%), Lead Time **{winner['Lead Time']}** "
+                    f"({winner['_lt_delta_pct']:+.1f}%) — the most economical winning strategy found so far."
                 )
+
+                if len(award_df) > 1:
+                    with st.expander("See full award ranking"):
+                        award_display = award_df[[
+                            "Scenario", "# Changes", "Capacity Changes", "Throughput", "Avg WIP", "Lead Time"
+                        ]].reset_index(drop=True)
+                        award_display.index = award_display.index + 1
+                        award_display.index.name = "Rank"
+                        st.dataframe(award_display, use_container_width=True)
 
             st.markdown("---")
             st.subheader("📥 Export Performance Evaluation")
             export_gate_df = gate_df[[
                 "Scenario", "Capacity Changes", "# Changes", "Throughput", "Required (≥5%)", "Throughput OK?",
-                "Avg WIP", "WIP Δ vs Base", "WIP OK? (≤ Base)", "Lead Time", "LT Δ vs Base", "LT OK? (≤ Base)",
-                "Gate Status"
+                "Avg WIP", "WIP Δ vs Base", "WIP OK? (< Base)", "Lead Time", "LT Δ vs Base", "LT OK? (< Base)",
+                "Within Budget?", "Gate Status"
             ]].set_index("Scenario")
             opt_output = io.BytesIO()
             with pd.ExcelWriter(opt_output, engine='xlsxwriter') as writer:
                 export_gate_df.to_excel(writer, sheet_name='Performance Gate')
                 if not passed_df.empty:
-                    rank_display.to_excel(writer, sheet_name='Ranking')
+                    award_df[[
+                        "Scenario", "# Changes", "Capacity Changes", "Throughput", "Avg WIP", "Lead Time"
+                    ]].to_excel(writer, sheet_name='Best Optimization Award', index=False)
             opt_excel_data = opt_output.getvalue()
             st.download_button(
                 label="⬇️ Download Evaluation (Excel)",
@@ -1054,35 +1109,56 @@ with tab3:
             )
 
             with st.expander("📐 How this evaluation works"):
+                budget_line = (
+                    f"\n\n**Improvement Budget** (currently {'enforced' if enforce_budget else 'informational only'}): "
+                    f"a scenario may change at most **{improvement_budget}** stations"
+                    + (" to pass the gate." if enforce_budget else ", shown for reference but not required to pass.")
+                )
                 st.markdown(f"""
-**Stage 1 — Feasibility Gate (non-compensatory).** A scenario must satisfy **all** of the following to be considered acceptable at all. Failing even one condition rejects the scenario outright, regardless of how good the others look:
+This is a **hierarchical, rule-based framework**, not a single formula — manufacturing optimization is a
+multi-objective decision, and no one number should be able to average away a failure on another dimension.
+
+**Stage 1 — Feasibility Gate (non-compensatory).** A scenario must satisfy **all** of the following to be
+considered acceptable at all. Failing even one condition rejects the scenario outright, regardless of how
+good the others look:
 
 | Criterion | Requirement |
 |---|---|
 | Throughput | ≥ {TARGET_GAIN_PCT:.0f}% increase over Base-Run (≥ {required_throughput:.0f} units) |
-| Average WIP | Must not increase from the Base-Run |
-| Lead Time | Must not increase from the Base-Run |
+| Average WIP | Must be lower than the Base-Run |
+| Lead Time | Must be lower than the Base-Run |{budget_line}
 
-This is deliberately **not a weighted average** — a scenario cannot compensate for a 100%+ WIP increase by over-delivering on throughput. That kind of trade-off hides congestion and bottlenecks rather than resolving them.
+If any one fails: **Overall Result = Not Acceptable.** No further scoring happens.
 
-**Stage 2 — Ranking + Efficiency Rating (only among scenarios that passed Stage 1).**
+**Stage 2 — Optimization Strategy.** Only scenarios that passed Stage 1 are rated here, purely on how many
+stations were touched — fewer changes means a more targeted, more economical improvement:
 
-Scenarios are ordered in strict priority: (1) Highest Throughput, (2) Lowest Average WIP, (3) Lowest Lead Time, (4) Fewest Capacity Changes. Capacity Changes are tracked but sit **outside** the gate — "as few as possible" is a tiebreaker among already-feasible solutions, not a pass/fail condition on its own.
-
-Alongside the rank, each scenario also gets a **Production Efficiency Index (PEI)** — a single balanced score of how much *overall* system improvement was squeezed out of each capacity change, so a scenario can't look good just by tuning one KPI hard while dragging the others:
-
-`PEI = (Throughput Improvement % + WIP Reduction % + Lead Time Reduction %) / Capacity Changes`
-
-| PEI | Rating |
+| Capacity Changes | Rating |
 |---:|---|
-| ≥ 25 | 🟢 Excellent |
-| 20 – 24.99 | 🟢 Very Good |
-| 15 – 19.99 | 🟡 Good |
-| 10 – 14.99 | 🟠 Fair |
-| < 10 | 🔴 Needs Improvement |
+| 1–2 | ⭐ Excellent |
+| 3–4 | ✅ Very Good |
+| 5 | 🟡 Good |
+| 6 | 🟠 Fair |
+| ≥ 7 | ❌ Poor |
 
-PEI is only ever computed for scenarios that already passed the Stage 1 gate — a scenario with worse WIP or Lead Time than base is **Rejected** before PEI even enters the picture, it never gets a rating at all.
+**Stage 3 — Overall Performance Rating.** Combines Stage 1 (pass/fail) with Stage 2 (capacity efficiency)
+into one rating, plus automatically generated feedback:
+
+| Condition | Overall Rating |
+|---|---|
+| Passed Gate + 1–2 Capacity Changes | ⭐ Excellent |
+| Passed Gate + 3–4 Capacity Changes | ✅ Very Good |
+| Passed Gate + 5 Capacity Changes | 🟡 Good |
+| Passed Gate + 6 Capacity Changes | 🟠 Fair |
+| Passed Gate + ≥ 7 Capacity Changes | ❌ Poor |
+| Failed Gate | ❌ Not Acceptable |
+
+**Bonus — Best Optimization Award.** Among scenarios that passed the gate, ranked by (1) fewest capacity
+changes, (2) highest throughput, (3) lowest Avg WIP, (4) lowest Lead Time. This rewards the most economical
+winning strategy, not just the single best-performing one — two scenarios can both pass with similar
+throughput/WIP/Lead Time, but the one that got there with fewer capacity changes wins the award.
                 """)
+
 
 # --- TAB 4: METHODOLOGY ---
 with tab4:
@@ -1145,9 +1221,9 @@ with tab4:
     """)
     st.info("""
     **The real objective:** develop an operating policy that increases throughput by at least **5%**, while
-    **not increasing** average WIP or Lead Time, using the **fewest possible capacity changes**. Evaluation
-    happens in two stages, and the stages are deliberately **not averaged together** — a scenario must
-    survive Stage 1 before Stage 2 even looks at it.
+    **not increasing** average WIP or Lead Time, using the **fewest possible capacity changes**. This is a
+    **hierarchical, rule-based framework**, not a single formula — a scenario must survive Stage 1 before any
+    further scoring even applies to it.
     """)
 
     meth_h3("Stage 1 — Feasibility Gate (non-compensatory)")
@@ -1158,58 +1234,62 @@ with tab4:
     rather than genuinely flowing through the system faster.
     """)
     st.latex(r"\text{Throughput}_{\text{scenario}} \geq 1.05 \times \text{Throughput}_{\text{base}}")
-    st.latex(r"\text{Avg WIP}_{\text{scenario}} \leq \text{Avg WIP}_{\text{base}}")
-    st.latex(r"\text{Lead Time}_{\text{scenario}} \leq \text{Lead Time}_{\text{base}}")
-    st.markdown("If **any one** of these fails, the scenario is marked **❌ REJECTED** regardless of how good the other two look.")
-
-    meth_h3("Stage 2 — Ranking + Efficiency Rating (only among scenarios that passed Stage 1)")
+    st.latex(r"\text{Avg WIP}_{\text{scenario}} < \text{Avg WIP}_{\text{base}}")
+    st.latex(r"\text{Lead Time}_{\text{scenario}} < \text{Lead Time}_{\text{base}}")
     st.markdown("""
-    Once a scenario clears the gate, it's ranked against the other acceptable scenarios in strict priority
-    order — each criterion only breaks ties left over by the one before it:
-    1. Highest Throughput
-    2. Lowest Average WIP
-    3. Lowest Lead Time
-    4. Fewest Capacity Changes
+    If **any one** of these fails, the scenario is marked **❌ Not Acceptable** regardless of how good the
+    other two look. An optional **Improvement Budget** can also be added on top — capping how many stations
+    may be modified at all — mirroring how real managers can't upgrade every workstation because resources
+    are limited.
+    """)
 
-    Capacity Changes deliberately sit **outside** the gate — "as few as possible" is how you break ties among
-    already-feasible solutions, not a condition a scenario can fail on its own. This mirrors how real
-    manufacturing improvement projects get evaluated: first confirm the change actually improves flow without
-    side effects, and only then compare competing solutions on efficiency and effort.
+    meth_h3("Stage 2 — Optimization Strategy")
+    st.markdown("""
+    Only scenarios that cleared Stage 1 are rated here — purely on how many stations were touched, since
+    fewer changes means a more targeted, more economical improvement:
+    """)
+    st.markdown("""
+| Capacity Changes | Rating |
+|---:|---|
+| 1–2 | ⭐ Excellent |
+| 3–4 | ✅ Very Good |
+| 5 | 🟡 Good |
+| 6 | 🟠 Fair |
+| ≥ 7 | ❌ Poor |
+    """)
+
+    meth_h3("Stage 3 — Overall Performance Rating")
+    st.markdown("""
+    Combines Stage 1 (pass/fail) with Stage 2 (capacity efficiency) into a single rating, with automatically
+    generated feedback text for each outcome — not just a bare Pass/Fail flag.
+    """)
+    st.markdown("""
+| Condition | Overall Rating |
+|---|---|
+| Passed Gate + 1–2 Capacity Changes | ⭐ Excellent |
+| Passed Gate + 3–4 Capacity Changes | ✅ Very Good |
+| Passed Gate + 5 Capacity Changes | 🟡 Good |
+| Passed Gate + 6 Capacity Changes | 🟠 Fair |
+| Passed Gate + ≥ 7 Capacity Changes | ❌ Poor |
+| Failed Gate | ❌ Not Acceptable |
     """)
 
     st.info("""
-    **Why not rank by throughput-per-capacity-change alone?** A single-KPI efficiency ratio can be misleading:
-    a scenario that only nudges throughput but slashes WIP and Lead Time with one lucky change can out-score
-    a scenario that delivers real, balanced improvement across all three — even though the second is
-    operationally the better outcome. The Production Efficiency Index below fixes this by crediting all three
-    KPIs together, not just throughput.
+    **Why rate by capacity changes instead of a blended formula?** Two scenarios can both clear the gate with
+    similar performance, but the one that used fewer capacity changes demonstrated sharper bottleneck
+    diagnosis. For example: Throughput +5.3% / WIP −90% / Lead Time −88% with 3 changes rates **Very Good**,
+    while Throughput +6.0% / WIP −92% / Lead Time −90% with 6 changes — despite the slightly better raw
+    numbers — rates only **Fair**. A single blended score can hide that trade-off; a tiered rule makes it explicit.
     """)
 
-    st.latex(r"\text{PEI} = \frac{\text{Throughput Improvement \%} + \text{WIP Reduction \%} + \text{Lead Time Reduction \%}}{\text{Capacity Changes}}")
+    meth_h3("Bonus — Best Optimization Award")
     st.markdown("""
-    All three terms are measured relative to the Base-Run, and PEI is only ever calculated for scenarios that
-    already passed the Stage 1 gate — so WIP Reduction % and Lead Time Reduction % are guaranteed non-negative
-    by the time PEI sees them. A scenario that fails the gate gets **no PEI at all**; it's Rejected before
-    scoring is even relevant.
+    Among all scenarios that passed the gate, the award goes to whichever ranks best in strict priority order:
+    1. Fewest Capacity Changes
+    2. Highest Throughput
+    3. Lowest Average WIP
+    4. Lowest Lead Time
+
+    This rewards the most **economical winning strategy**, not simply the best-performing one — encouraging
+    students to search for the best trade-off rather than just clearing the bar.
     """)
-
-    rating_col1, rating_col2 = st.columns([1, 1])
-    with rating_col1:
-        st.markdown("""
-| PEI | Rating |
-|---:|---|
-| ≥ 25 | 🟢 Excellent |
-| 20 – 24.99 | 🟢 Very Good |
-| 15 – 19.99 | 🟡 Good |
-| 10 – 14.99 | 🟠 Fair |
-| < 10 | 🔴 Needs Improvement |
-        """)
-    with rating_col2:
-        st.markdown("""
-**Worked example** — Scenario with Throughput +6.1%, WIP −93.1%, Lead Time −93.5%, achieved with 6 capacity changes:
-
-PEI = (6.1 + 93.1 + 93.5) / 6 ≈ **32.1** → 🟢 Excellent
-
-A scenario that only reaches +1.4% throughput while WIP and Lead Time both got *worse* than base never reaches
-this stage — it's Rejected at the gate, regardless of how few capacity changes it used.
-        """)
