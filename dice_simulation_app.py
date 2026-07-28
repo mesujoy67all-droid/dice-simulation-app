@@ -483,12 +483,16 @@ if run_sim_clicked:
             dice_configs['A'] = dice_configs[choke_target_station]
 
         if capacity_mode == "Random Generation":
-            np.random.seed(st.session_state.sim_seed)
             dice_rolls = {}
-            
-            for m in members:
+
+            # Each station gets its OWN random stream (seed + station index), not one shared
+            # continuous stream. Otherwise, changing station B's dice range changes how many
+            # values get drawn from the shared stream, silently shifting the results for every
+            # station that comes after B in the loop -- even though their range never changed.
+            for i, m in enumerate(members):
                 if m == 'A' and activate_choke_release and choke_target_station:
                     continue
+                np.random.seed(st.session_state.sim_seed + i)
                 dice_rolls[m] = [np.random.randint(dice_configs[m][0], dice_configs[m][1] + 1) for _ in range(num_days)]
             
             if activate_choke_release and choke_target_station:
@@ -504,12 +508,14 @@ if run_sim_clicked:
             df_dice.index.name = "Day"
             
             if not is_base_run and dice_configs:
-                np.random.seed(42) 
-                for m in members:
+                for i, m in enumerate(members):
                     if m == 'A' and activate_choke_release:
                         continue
                     low, high = dice_configs[m]
                     if (low != 1) or (high != 6):
+                        # Independent per-station stream, same reasoning as Random Generation mode --
+                        # so regenerating one station's column can never shift another station's values.
+                        np.random.seed(42 + i)
                         df_dice[m] = [np.random.randint(low, high + 1) for _ in range(num_days)]
                 
                 if activate_choke_release and choke_target_station:
