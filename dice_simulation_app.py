@@ -928,7 +928,7 @@ with tab3:
                     "_lt_delta_pct": lt_delta_pct,
                 })
 
-                    GATE_COLUMNS = [
+            GATE_COLUMNS = [
                     "Scenario",
                     "Capacity Changes",
                     "# Changes",
