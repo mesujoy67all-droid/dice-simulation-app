@@ -816,7 +816,6 @@ with tab3:
             base_avg_wip = base_row["Avg WIP (W_avg)"]
             base_lead_time = base_row["Lead Time (L = Avg WIP / TR)"]
             base_ranges = stn_df[stn_df["Scenario"] == "Base-Run"].set_index("Station")["Dice Range"].to_dict()
-            base_station_wip = stn_df[stn_df["Scenario"] == "Base-Run"].set_index("Station")["Avg WIP"].to_dict()
 
             TARGET_GAIN_PCT = 5.0
             required_throughput = base_throughput * (1 + TARGET_GAIN_PCT / 100)
@@ -848,35 +847,57 @@ with tab3:
                 changed_stations = sorted([s for s in scen_ranges if scen_ranges.get(s) != base_ranges.get(s)])
                 num_changes = len(changed_stations)
 
-                scen_station_wip = stn_df[stn_df["Scenario"] == scen].set_index("Station")["Avg WIP"].to_dict()
+                # --- Average capacity constraint ---
+                # For every changed station, scenario average capacity must
+                # be <= the Base-Run average capacity for that same station.
+
+                avg_capacity_checks = {}
+
+                for station in changed_stations:
+                    base_low, base_high = map(int, str(base_ranges[station]).split("-"))
+                    scen_low, scen_high = map(int, str(scen_ranges[station]).split("-"))
+                
+                    base_avg_capacity = (base_low + base_high) / 2
+                    scen_avg_capacity = (scen_low + scen_high) / 2
+                
+                    avg_capacity_checks[station] = {
+                        "base_avg": base_avg_capacity,
+                        "scenario_avg": scen_avg_capacity,
+                        "pass": scen_avg_capacity <= base_avg_capacity
+                    }
+                
+                meets_avg_capacity = all(
+                    check["pass"] for check in avg_capacity_checks.values()
+                )
 
                 gain_pct = ((tp - base_throughput) / base_throughput * 100) if base_throughput > 0 else 0.0
                 wip_delta_pct = ((avg_wip - base_avg_wip) / base_avg_wip * 100) if base_avg_wip > 0 else 0.0
                 lt_delta_pct = ((lead_time - base_lead_time) / base_lead_time * 100) if base_lead_time > 0 else 0.0
 
-                # --- STAGE 1: Mandatory feasibility gate. ALL conditions must pass. ---
+                # --- STAGE 1: Mandatory feasibility gate. ALL three must pass. ---
                 meets_tp = tp >= required_throughput
                 meets_wip = avg_wip < base_avg_wip
                 meets_lt = lead_time < base_lead_time
                 within_budget = num_changes <= improvement_budget
-
-                # Station-level check: for EVERY station whose capacity range was changed, that
-                # station's own average WIP must be <= its Base-Run average WIP. A scenario
-                # can't pass just by improving the system-wide average while the very station
-                # being modified is still building up local WIP.
-                station_wip_checks = []
-                for s in changed_stations:
-                    s_scen_wip = scen_station_wip.get(s, 0.0)
-                    s_base_wip = base_station_wip.get(s, 0.0)
-                    station_wip_checks.append((s, s_scen_wip, s_base_wip, s_scen_wip <= s_base_wip))
-                meets_station_wip = all(chk[3] for chk in station_wip_checks) if station_wip_checks else True
-
-                gate_passed = meets_tp and meets_wip and meets_lt and meets_station_wip and (within_budget if enforce_budget else True)
+                gate_passed = (
+                    meets_tp
+                    and meets_wip
+                    and meets_lt
+                    and meets_avg_capacity
+                    and (within_budget if enforce_budget else True)
+                )
 
                 gate_rows.append({
                     "Scenario": scen,
                     "Capacity Changes": ", ".join(changed_stations) if changed_stations else "None",
                     "# Changes": num_changes,
+                    "Avg Capacity ≤ Base?": "Yes" if meets_avg_capacity else "No",
+                    "Avg Capacity Details": "; ".join(
+                        f"{s}: {avg_capacity_checks[s]['scenario_avg']:.2f} "
+                        f"vs Base {avg_capacity_checks[s]['base_avg']:.2f}"
+                        for s in changed_stations
+                    ) if changed_stations else "No capacity changes",
+                    "_meets_avg_capacity": meets_avg_capacity,
                     "Throughput": int(tp),
                     "Required (≥5%)": round(required_throughput, 0),
                     "Throughput OK?": "Yes" if meets_tp else "No",
@@ -886,7 +907,6 @@ with tab3:
                     "Lead Time": lead_time,
                     "LT Δ vs Base": round(lt_delta_pct, 1),
                     "LT OK? (< Base)": "Yes" if meets_lt else "No",
-                    "Station WIP OK? (≤ Base)": "Yes" if meets_station_wip else "No",
                     "Within Budget?": "Yes" if within_budget else "No",
                     "Gate Status": "PASSED" if gate_passed else "REJECTED",
                     "_gate_passed": gate_passed,
@@ -897,8 +917,6 @@ with tab3:
                     "_meets_tp": meets_tp,
                     "_meets_wip": meets_wip,
                     "_meets_lt": meets_lt,
-                    "_meets_station_wip": meets_station_wip,
-                    "_station_wip_checks": station_wip_checks,
                     "_within_budget": within_budget,
                     "_tp": tp,
                     "_required_tp": required_throughput,
@@ -907,12 +925,10 @@ with tab3:
                 })
 
             GATE_COLUMNS = [
-                "Scenario", "Capacity Changes", "# Changes", "Throughput", "Required (≥5%)", "Throughput OK?",
+                "Scenario", "Capacity Changes", "# Changes","Avg Capacity ≤ Base?","Avg Capacity Details", "_meets_avg_capacity","Throughput", "Required (≥5%)", "Throughput OK?",
                 "Avg WIP", "WIP Δ vs Base", "WIP OK? (< Base)", "Lead Time", "LT Δ vs Base", "LT OK? (< Base)",
-                "Station WIP OK? (≤ Base)", "Within Budget?", "Gate Status",
-                "_gate_passed", "_gain_pct", "_avg_wip", "_lead_time", "_num_changes",
-                "_meets_tp", "_meets_wip", "_meets_lt", "_meets_station_wip", "_station_wip_checks",
-                "_within_budget", "_tp", "_required_tp", "_wip_delta_pct", "_lt_delta_pct",
+                "Within Budget?", "Gate Status", "_gate_passed", "_gain_pct", "_avg_wip", "_lead_time", "_num_changes",
+                "_meets_tp", "_meets_wip", "_meets_lt", "_within_budget", "_tp", "_required_tp", "_wip_delta_pct", "_lt_delta_pct",
             ]
             gate_df = pd.DataFrame(gate_rows, columns=GATE_COLUMNS)
             passed_df = gate_df[gate_df["_gate_passed"] == True].copy() if not gate_df.empty else gate_df.copy()
@@ -933,15 +949,6 @@ with tab3:
                 return (f"{value} <span class='{cls}'>({arrow}{abs(gain_pct):.1f}%)</span>"
                         f"<br><span style='color:var(--muted); font-size:0.78rem;'>need ≥ +5.0%</span>")
 
-            def station_wip_cell(checks):
-                if not checks:
-                    return "<span style='color:var(--muted); font-size:0.82rem;'>No stations changed</span>"
-                parts = []
-                for s, scen_val, base_val, ok in checks:
-                    cls = "eval-num-ok" if ok else "eval-num-fail"
-                    parts.append(f"<span class='{cls}'>{s}: {scen_val:.2f} ≤ {base_val:.2f}</span>")
-                return "<br>".join(parts)
-
             # --- Summary metrics ---
             m1, m2, m3, m4 = st.columns(4)
             with m1:
@@ -961,11 +968,8 @@ with tab3:
                     st.metric("Top-Ranked Scenario", "—")
 
             st.markdown("<hr>", unsafe_allow_html=True)
-            section_header("STAGE 1", "✔ Performance Gate — All Conditions Must Pass")
-            gate_caption = ("Throughput must reach the +5% target. Average WIP and Lead Time must be LOWER than the Base-Run. "
-                             "For every station whose capacity range was changed, that station's own average WIP must also be "
-                             "no higher than its Base-Run value. If any one fails, the scenario is Rejected — a strong throughput "
-                             "number cannot buy back excessive WIP or Lead Time, system-wide or at the station you actually touched.")
+            section_header("STAGE 1", "✔ Performance Gate — All Three Must Pass")
+            gate_caption = "Throughput must reach the +5% target. Average WIP and Lead Time must be LOWER than the Base-Run. If any one fails, the scenario is Rejected — a strong throughput number cannot buy back excessive WIP or Lead Time."
             if enforce_budget:
                 gate_caption += f" Capacity Changes must also stay within the {improvement_budget}-point Improvement Budget."
             st.caption(gate_caption)
@@ -984,7 +988,7 @@ with tab3:
                         <td>{throughput_cell(int(r['_tp']), r['_gain_pct'], r['_meets_tp'])} {pill(r['_meets_tp'])}</td>
                         <td>{metric_cell(r['_avg_wip'], r['_wip_delta_pct'], r['_meets_wip'])} {pill(r['_meets_wip'])}</td>
                         <td>{metric_cell(r['_lead_time'], r['_lt_delta_pct'], r['_meets_lt'])} {pill(r['_meets_lt'])}</td>
-                        <td>{station_wip_cell(r['_station_wip_checks'])} {pill(r['_meets_station_wip'])}</td>
+                        <td>{pill(r['_meets_avg_capacity'])}</td>
                         <td>{pill(r['_gate_passed'])}</td>
                     </tr>""")
 
@@ -993,8 +997,8 @@ with tab3:
                 <table class="eval-table">
                     <thead><tr>
                         <th>Scenario</th><th>Capacity Changes</th><th># Changes</th>
-                        <th>Throughput (req)</th><th>Avg WIP (Δ)</th><th>Lead Time (Δ)</th>
-                        <th>Station WIP (changed stations only)</th><th>Gate</th>
+                        <th>Throughput (req)</th><th>Avg WIP (Δ)</th>
+                        <th>Lead Time (Δ)</th><th>Avg Capacity ≤ Base?</th><th>Gate</th>
                     </tr></thead>
                     <tbody>{''.join(gate_html_rows)}</tbody>
                 </table>
@@ -1130,7 +1134,7 @@ with tab3:
             export_gate_df = gate_df[[
                 "Scenario", "Capacity Changes", "# Changes", "Throughput", "Required (≥5%)", "Throughput OK?",
                 "Avg WIP", "WIP Δ vs Base", "WIP OK? (< Base)", "Lead Time", "LT Δ vs Base", "LT OK? (< Base)",
-                "Station WIP OK? (≤ Base)", "Within Budget?", "Gate Status"
+                "Within Budget?", "Gate Status"
             ]].set_index("Scenario")
             opt_output = io.BytesIO()
             with pd.ExcelWriter(opt_output, engine='xlsxwriter') as writer:
@@ -1165,9 +1169,8 @@ good the others look:
 | Criterion | Requirement |
 |---|---|
 | Throughput | ≥ {TARGET_GAIN_PCT:.0f}% increase over Base-Run (≥ {required_throughput:.0f} units) |
-| Average WIP (system-wide) | Must be lower than the Base-Run |
-| Lead Time | Must be lower than the Base-Run |
-| Station WIP (per changed station) | For every station whose capacity range was changed, that station's own average WIP must be ≤ its Base-Run value |{budget_line}
+| Average WIP | Must be lower than the Base-Run |
+| Lead Time | Must be lower than the Base-Run |{budget_line}
 
 If any one fails: **Overall Result = Not Acceptable.** No further scoring happens.
 
@@ -1262,30 +1265,26 @@ with tab4:
     """)
     st.info("""
     **The real objective:** develop an operating policy that increases throughput by at least **5%**, while
-    **not increasing** average WIP or Lead Time — system-wide AND at the specific station(s) you modify — using
-    the **fewest possible capacity changes**. This is a **hierarchical, rule-based framework**, not a single
-    formula — a scenario must survive Stage 1 before any further scoring even applies to it.
+    **not increasing** average WIP or Lead Time, using the **fewest possible capacity changes**. This is a
+    **hierarchical, rule-based framework**, not a single formula — a scenario must survive Stage 1 before any
+    further scoring even applies to it.
     """)
 
     meth_h3("Stage 1 — Feasibility Gate (non-compensatory)")
     st.markdown("""
-    A scenario must satisfy **all** of the conditions below to be considered acceptable. Passing most of them
-    is not a partial success — it's a rejection. A large throughput gain cannot buy back excessive WIP or Lead
-    Time, because in a real production line that "gain" is usually just work piling up in queues rather than
-    genuinely flowing through the system faster.
+    A scenario must satisfy **all three** conditions below to be considered acceptable. Passing two out of
+    three is not a partial success — it's a rejection. A large throughput gain cannot buy back excessive WIP
+    or Lead Time, because in a real production line that "gain" is usually just work piling up in queues
+    rather than genuinely flowing through the system faster.
     """)
     st.latex(r"\text{Throughput}_{\text{scenario}} \geq 1.05 \times \text{Throughput}_{\text{base}}")
     st.latex(r"\text{Avg WIP}_{\text{scenario}} < \text{Avg WIP}_{\text{base}}")
     st.latex(r"\text{Lead Time}_{\text{scenario}} < \text{Lead Time}_{\text{base}}")
-    st.latex(r"\text{Station Avg WIP}_{\text{scenario}, s} \leq \text{Station Avg WIP}_{\text{base}, s} \quad \forall\, s \in \text{Changed Stations}")
     st.markdown("""
-    That last condition is the **station-level check**: it doesn't just look at the system-wide average — for
-    every station whose dice range was actually changed, that station's own average WIP must be no higher than
-    its Base-Run value. A scenario can improve the system-wide average while the exact station you modified
-    still builds up local congestion; this check catches that case directly. If **any** condition fails, the
-    scenario is marked **❌ Not Acceptable** regardless of how good the others look. An optional **Improvement
-    Budget** can also be added on top — capping how many stations may be modified at all — mirroring how real
-    managers can't upgrade every workstation because resources are limited.
+    If **any one** of these fails, the scenario is marked **❌ Not Acceptable** regardless of how good the
+    other two look. An optional **Improvement Budget** can also be added on top — capping how many stations
+    may be modified at all — mirroring how real managers can't upgrade every workstation because resources
+    are limited.
     """)
 
     meth_h3("Stage 2 — Optimization Strategy")
