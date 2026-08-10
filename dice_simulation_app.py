@@ -846,13 +846,9 @@ with tab3:
                 scen_ranges = stn_df[stn_df["Scenario"] == scen].set_index("Station")["Dice Range"].to_dict()
                 changed_stations = sorted([s for s in scen_ranges if scen_ranges.get(s) != base_ranges.get(s)])
                 num_changes = len(changed_stations)
-
                 # --- Average capacity constraint ---
-                # For every changed station, scenario average capacity must
-                # be <= the Base-Run average capacity for that same station.
-
                 avg_capacity_checks = {}
-
+                
                 for station in changed_stations:
                     base_low, base_high = map(int, str(base_ranges[station]).split("-"))
                     scen_low, scen_high = map(int, str(scen_ranges[station]).split("-"))
@@ -861,6 +857,8 @@ with tab3:
                     scen_avg_capacity = (scen_low + scen_high) / 2
                 
                     avg_capacity_checks[station] = {
+                        "base_range": base_ranges[station],
+                        "scenario_range": scen_ranges[station],
                         "base_avg": base_avg_capacity,
                         "scenario_avg": scen_avg_capacity,
                         "pass": scen_avg_capacity <= base_avg_capacity
@@ -869,6 +867,16 @@ with tab3:
                 meets_avg_capacity = all(
                     check["pass"] for check in avg_capacity_checks.values()
                 )
+                
+                avg_capacity_display = "<br>".join(
+                    f"<b>{station}</b>: "
+                    f"Base {avg_capacity_checks[station]['base_range']} "
+                    f"(Avg {avg_capacity_checks[station]['base_avg']:.2f}) "
+                    f"→ Current {avg_capacity_checks[station]['scenario_range']} "
+                    f"(Avg {avg_capacity_checks[station]['scenario_avg']:.2f}) "
+                    f"{'✅' if avg_capacity_checks[station]['pass'] else '❌'}"
+                    for station in changed_stations
+                ) if changed_stations else "No capacity changes"
 
                 gain_pct = ((tp - base_throughput) / base_throughput * 100) if base_throughput > 0 else 0.0
                 wip_delta_pct = ((avg_wip - base_avg_wip) / base_avg_wip * 100) if base_avg_wip > 0 else 0.0
@@ -879,11 +887,12 @@ with tab3:
                 meets_wip = avg_wip < base_avg_wip
                 meets_lt = lead_time < base_lead_time
                 within_budget = num_changes <= improvement_budget
+                
                 gate_passed = (
-                    meets_tp
+                    meets_avg_capacity
+                    and meets_tp
                     and meets_wip
                     and meets_lt
-                    and meets_avg_capacity
                     and (within_budget if enforce_budget else True)
                 )
 
@@ -891,13 +900,7 @@ with tab3:
                     "Scenario": scen,
                     "Capacity Changes": ", ".join(changed_stations) if changed_stations else "None",
                     "# Changes": num_changes,
-                    "Avg Capacity ≤ Base?": "Yes" if meets_avg_capacity else "No",
-                    "Avg Capacity Details": "; ".join(
-                        f"{s}: {avg_capacity_checks[s]['scenario_avg']:.2f} "
-                        f"vs Base {avg_capacity_checks[s]['base_avg']:.2f}"
-                        for s in changed_stations
-                    ) if changed_stations else "No capacity changes",
-                    "_meets_avg_capacity": meets_avg_capacity,
+                    "Avg Capacity vs Base": avg_capacity_display,
                     "Throughput": int(tp),
                     "Required (≥5%)": round(required_throughput, 0),
                     "Throughput OK?": "Yes" if meets_tp else "No",
@@ -917,6 +920,7 @@ with tab3:
                     "_meets_tp": meets_tp,
                     "_meets_wip": meets_wip,
                     "_meets_lt": meets_lt,
+                    "_meets_avg_capacity": meets_avg_capacity,
                     "_within_budget": within_budget,
                     "_tp": tp,
                     "_required_tp": required_throughput,
@@ -924,11 +928,22 @@ with tab3:
                     "_lt_delta_pct": lt_delta_pct,
                 })
 
-            GATE_COLUMNS = [
-                "Scenario", "Capacity Changes", "# Changes","Avg Capacity ≤ Base?","Avg Capacity Details", "_meets_avg_capacity","Throughput", "Required (≥5%)", "Throughput OK?",
-                "Avg WIP", "WIP Δ vs Base", "WIP OK? (< Base)", "Lead Time", "LT Δ vs Base", "LT OK? (< Base)",
-                "Within Budget?", "Gate Status", "_gate_passed", "_gain_pct", "_avg_wip", "_lead_time", "_num_changes",
-                "_meets_tp", "_meets_wip", "_meets_lt", "_within_budget", "_tp", "_required_tp", "_wip_delta_pct", "_lt_delta_pct",
+                    GATE_COLUMNS = [
+                    "Scenario",
+                    "Capacity Changes",
+                    "# Changes",
+                    "Avg Capacity vs Base",
+                    "Throughput",
+                    "Required (≥5%)",
+                    "Throughput OK?",
+                    "Avg WIP",
+                    "WIP Δ vs Base",
+                    "WIP OK? (< Base)",
+                    "Lead Time",
+                    "LT Δ vs Base",
+                    "LT OK? (< Base)",
+                    "Within Budget?", "Gate Status", "_gate_passed", "_gain_pct", "_avg_wip", "_lead_time", "_num_changes",
+                    "_meets_tp", "_meets_wip", "_meets_lt", "_within_budget", "_tp", "_required_tp", "_wip_delta_pct", "_lt_delta_pct",
             ]
             gate_df = pd.DataFrame(gate_rows, columns=GATE_COLUMNS)
             passed_df = gate_df[gate_df["_gate_passed"] == True].copy() if not gate_df.empty else gate_df.copy()
@@ -985,10 +1000,13 @@ with tab3:
                         <td class="scen-cell">{r['Scenario']}</td>
                         <td>{r['Capacity Changes']}</td>
                         <td>{r['# Changes']}{budget_cell}</td>
+                    
+                        <!-- NEW: Avg Capacity vs Base BEFORE Throughput -->
+                        <td>{r['Avg Capacity vs Base']}</td>
+                    
                         <td>{throughput_cell(int(r['_tp']), r['_gain_pct'], r['_meets_tp'])} {pill(r['_meets_tp'])}</td>
                         <td>{metric_cell(r['_avg_wip'], r['_wip_delta_pct'], r['_meets_wip'])} {pill(r['_meets_wip'])}</td>
                         <td>{metric_cell(r['_lead_time'], r['_lt_delta_pct'], r['_meets_lt'])} {pill(r['_meets_lt'])}</td>
-                        <td>{pill(r['_meets_avg_capacity'])}</td>
                         <td>{pill(r['_gate_passed'])}</td>
                     </tr>""")
 
@@ -996,9 +1014,14 @@ with tab3:
                 <div class="eval-table-wrap">
                 <table class="eval-table">
                     <thead><tr>
-                        <th>Scenario</th><th>Capacity Changes</th><th># Changes</th>
-                        <th>Throughput (req)</th><th>Avg WIP (Δ)</th>
-                        <th>Lead Time (Δ)</th><th>Avg Capacity ≤ Base?</th><th>Gate</th>
+                        <th>Scenario</th>
+                        <th>Capacity Changes</th>
+                        <th># Changes</th>
+                        <th>Avg Capacity vs Base</th>
+                        <th>Throughput (req)</th>
+                        <th>Avg WIP (Δ)</th>
+                        <th>Lead Time (Δ)</th>
+                        <th>Gate</th>
                     </tr></thead>
                     <tbody>{''.join(gate_html_rows)}</tbody>
                 </table>
