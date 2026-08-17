@@ -864,8 +864,20 @@ with tab3:
                     scen_cap_avg = 0.0
                 cap_delta_pct = ((scen_cap_avg - base_cap_avg) / base_cap_avg * 100) if base_cap_avg > 0 else 0.0
 
+                # Per-station capacity comparison (Base vs Scenario) for every station that was
+                # actually touched, so the gate table can name each station individually rather
+                # than only showing one blended average across possibly several changed stations.
+                station_caps = []
+                for s in changed_stations:
+                    s_base_cap = base_avg_capacity.get(s, 0)
+                    s_scen_cap = scen_avg_capacity.get(s, 0)
+                    s_delta_pct = ((s_scen_cap - s_base_cap) / s_base_cap * 100) if s_base_cap > 0 else 0.0
+                    station_caps.append((s, s_base_cap, s_scen_cap, s_delta_pct))
+
                 # --- STAGE 1: Mandatory feasibility gate. ALL four must pass. ---
-                meets_tp = tp >= required_throughput
+                # Throughput must simply be an increase over the Base-Run -- there is no fixed
+                # percentage target. The achieved % gain is still shown in the table for context.
+                meets_tp = tp > base_throughput
                 meets_wip = avg_wip < base_avg_wip
                 meets_lt = lead_time < base_lead_time
                 meets_cap = (scen_cap_avg <= base_cap_avg) if changed_stations else True
@@ -877,7 +889,6 @@ with tab3:
                     "Capacity Changes": ", ".join(changed_stations) if changed_stations else "None",
                     "# Changes": num_changes,
                     "Throughput": int(tp),
-                    "Required (≥5%)": round(required_throughput, 0),
                     "Throughput OK?": "Yes" if meets_tp else "No",
                     "Avg WIP": avg_wip,
                     "WIP Δ vs Base": round(wip_delta_pct, 1),
@@ -907,15 +918,16 @@ with tab3:
                     "_base_cap_avg": base_cap_avg,
                     "_scen_cap_avg": scen_cap_avg,
                     "_cap_delta_pct": cap_delta_pct,
+                    "_station_caps": station_caps,
                 })
 
             GATE_COLUMNS = [
-                "Scenario", "Capacity Changes", "# Changes", "Throughput", "Required (≥5%)", "Throughput OK?",
+                "Scenario", "Capacity Changes", "# Changes", "Throughput", "Throughput OK?",
                 "Avg WIP", "WIP Δ vs Base", "WIP OK? (< Base)", "Lead Time", "LT Δ vs Base", "LT OK? (< Base)",
                 "Avg Capacity (Base)", "Avg Capacity (Scenario)", "Capacity OK? (≤ Base)",
                 "Within Budget?", "Gate Status", "_gate_passed", "_gain_pct", "_avg_wip", "_lead_time", "_num_changes",
                 "_meets_tp", "_meets_wip", "_meets_lt", "_meets_cap", "_within_budget", "_tp", "_required_tp",
-                "_wip_delta_pct", "_lt_delta_pct", "_base_cap_avg", "_scen_cap_avg", "_cap_delta_pct",
+                "_wip_delta_pct", "_lt_delta_pct", "_base_cap_avg", "_scen_cap_avg", "_cap_delta_pct", "_station_caps",
             ]
             gate_df = pd.DataFrame(gate_rows, columns=GATE_COLUMNS)
             passed_df = gate_df[gate_df["_gate_passed"] == True].copy() if not gate_df.empty else gate_df.copy()
@@ -934,15 +946,20 @@ with tab3:
                 cls = "eval-num-ok" if ok else "eval-num-fail"
                 arrow = "▼" if gain_pct <= 0 else "▲"
                 return (f"{value} <span class='{cls}'>({arrow}{abs(gain_pct):.1f}%)</span>"
-                        f"<br><span style='color:var(--muted); font-size:0.78rem;'>need ≥ +5.0%</span>")
+                        f"<br><span style='color:var(--muted); font-size:0.78rem;'>must be higher than Base</span>")
 
-            def capacity_cell(base_val, scen_val, delta_pct, ok, has_changes):
+            def capacity_cell(station_caps, ok, has_changes):
                 if not has_changes:
                     return "<span style='color:var(--muted);'>N/A (no changes)</span>"
                 cls = "eval-num-ok" if ok else "eval-num-fail"
-                arrow = "▼" if delta_pct <= 0 else "▲"
-                return (f"{scen_val:.2f} vs {base_val:.2f} "
-                        f"<span class='{cls}'>({arrow}{abs(delta_pct):.1f}%)</span>")
+                parts = []
+                for s, base_val, scen_val, delta_pct in station_caps:
+                    arrow = "▼" if delta_pct <= 0 else "▲"
+                    parts.append(
+                        f"<b>{s}:</b> {scen_val:.2f} vs {base_val:.2f} "
+                        f"<span class='{cls}'>({arrow}{abs(delta_pct):.1f}%)</span>"
+                    )
+                return "<br>".join(parts)
 
             # --- Summary metrics ---
             m1, m2, m3, m4 = st.columns(4)
@@ -965,12 +982,13 @@ with tab3:
             st.markdown("<hr>", unsafe_allow_html=True)
             section_header("STAGE 1", "✔ Performance Gate — All Four Must Pass")
             gate_caption = (
-                "Throughput must reach the +5% target. Average WIP and Lead Time must be LOWER than the "
-                "Base-Run. The average dice-range capacity of any station that was modified must be EQUAL "
-                "TO OR LOWER than that same station's Base-Run capacity — the gain has to come from "
-                "rebalancing/choke-release rather than simply handing every station a bigger dice range. "
-                "If any one condition fails, the scenario is Rejected — a strong throughput number cannot "
-                "buy back excessive WIP, Lead Time, or capacity inflation."
+                "Throughput must be HIGHER than the Base-Run (any increase is mandatory — the exact "
+                "percentage achieved is shown, but no fixed target is enforced). Average WIP and Lead Time "
+                "must be LOWER than the Base-Run. The average dice-range capacity of any station that was "
+                "modified must be EQUAL TO OR LOWER than that same station's Base-Run capacity — the gain "
+                "has to come from rebalancing/choke-release rather than simply handing every station a "
+                "bigger dice range. If any one condition fails, the scenario is Rejected — a strong "
+                "throughput number cannot buy back excessive WIP, Lead Time, or capacity inflation."
             )
             if enforce_budget:
                 gate_caption += f" Capacity Changes must also stay within the {improvement_budget}-point Improvement Budget."
@@ -988,10 +1006,10 @@ with tab3:
                         <td class="scen-cell">{r['Scenario']}</td>
                         <td>{r['Capacity Changes']}</td>
                         <td>{r['# Changes']}{budget_cell}</td>
+                        <td>{capacity_cell(r['_station_caps'], r['_meets_cap'], has_changes)} {pill(r['_meets_cap'])}</td>
                         <td>{throughput_cell(int(r['_tp']), r['_gain_pct'], r['_meets_tp'])} {pill(r['_meets_tp'])}</td>
                         <td>{metric_cell(r['_avg_wip'], r['_wip_delta_pct'], r['_meets_wip'])} {pill(r['_meets_wip'])}</td>
                         <td>{metric_cell(r['_lead_time'], r['_lt_delta_pct'], r['_meets_lt'])} {pill(r['_meets_lt'])}</td>
-                        <td>{capacity_cell(r['_base_cap_avg'], r['_scen_cap_avg'], r['_cap_delta_pct'], r['_meets_cap'], has_changes)} {pill(r['_meets_cap'])}</td>
                         <td>{pill(r['_gate_passed'])}</td>
                     </tr>""")
 
@@ -1000,8 +1018,8 @@ with tab3:
                 <table class="eval-table">
                     <thead><tr>
                         <th>Scenario</th><th>Capacity Changes</th><th># Changes</th>
-                        <th>Throughput (req)</th><th>Avg WIP (Δ)</th><th>Lead Time (Δ)</th>
-                        <th>Avg Capacity — Scenario vs Base (Δ)</th><th>Gate</th>
+                        <th>Avg Capacity — Scenario vs Base (Δ)</th><th>Throughput (Δ)</th><th>Avg WIP (Δ)</th>
+                        <th>Lead Time (Δ)</th><th>Gate</th>
                     </tr></thead>
                     <tbody>{''.join(gate_html_rows)}</tbody>
                 </table>
@@ -1135,7 +1153,7 @@ with tab3:
             st.markdown("---")
             st.subheader("📥 Export Performance Evaluation")
             export_gate_df = gate_df[[
-                "Scenario", "Capacity Changes", "# Changes", "Throughput", "Required (≥5%)", "Throughput OK?",
+                "Scenario", "Capacity Changes", "# Changes", "Throughput", "Throughput OK?",
                 "Avg WIP", "WIP Δ vs Base", "WIP OK? (< Base)", "Lead Time", "LT Δ vs Base", "LT OK? (< Base)",
                 "Avg Capacity (Base)", "Avg Capacity (Scenario)", "Capacity OK? (≤ Base)",
                 "Within Budget?", "Gate Status"
@@ -1172,7 +1190,7 @@ good the others look:
 
 | Criterion | Requirement |
 |---|---|
-| Throughput | ≥ {TARGET_GAIN_PCT:.0f}% increase over Base-Run (≥ {required_throughput:.0f} units) |
+| Throughput | Must be **higher** than the Base-Run (mandatory increase — no fixed percentage target; the % achieved is shown for reference) |
 | Average WIP | Must be lower than the Base-Run |
 | Lead Time | Must be lower than the Base-Run |
 | Avg Range Capacity (changed stations) | Must be ≤ the same stations' Base-Run capacity |{budget_line}
@@ -1203,8 +1221,8 @@ into one rating, plus automatically generated feedback:
 | Failed Gate | ❌ Not Acceptable |
 
 **Bonus — Best Optimization Award.** Among scenarios that passed the gate, ranked by (1) fewest capacity
-changes, (2) highest throughput, (3) lowest Avg WIP, (4) lowest Lead Time. This rewards the most economical
-winning strategy, not just the single best-performing one — two scenarios can both pass with similar
+changes, (2) highest throughput, (3) lowest Avg WIP, (4) lowest Lead Time. This rewards the most
+economical winning strategy, not just the single best-performing one — two scenarios can both pass with similar
 throughput/WIP/Lead Time, but the one that got there with fewer capacity changes wins the award.
                 """)
 
