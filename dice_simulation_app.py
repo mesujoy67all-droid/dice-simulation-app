@@ -945,8 +945,7 @@ with tab3:
             def throughput_cell(value, gain_pct, ok):
                 cls = "eval-num-ok" if ok else "eval-num-fail"
                 arrow = "▼" if gain_pct <= 0 else "▲"
-                return (f"{value} <span class='{cls}'>({arrow}{abs(gain_pct):.1f}%)</span>"
-                        f"<br><span style='color:var(--muted); font-size:0.78rem;'>must be higher than Base</span>")
+                return f"{value} <span class='{cls}'>({arrow}{abs(gain_pct):.1f}%)</span>"
 
             def capacity_cell(station_caps, ok, has_changes):
                 if not has_changes:
